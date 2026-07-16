@@ -14,12 +14,6 @@ const quickActions = [
   { title: 'Manage Students', description: 'Update student roster', icon: Users, action: 'students' },
 ]
 
-const recentActivities = [
-  { event: 'Video Processed', detail: 'Data Science Workshop - 28 students detected', time: '2 hours ago' },
-  { event: 'Session Created', detail: 'Web Development Q&A scheduled', time: '5 hours ago' },
-  { event: 'Recording Uploaded', detail: 'ML Study Group video uploaded', time: '1 day ago' },
-]
-
 export default function SessionsPage() {
   const navigate = useNavigate()
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -60,6 +54,22 @@ export default function SessionsPage() {
       }
     })
   }, [])
+
+  const recentActivities = useMemo(() => {
+    if (processedVideos.length > 0) {
+      return processedVideos.slice(0, 5).map((video) => ({
+        event: 'Video processed',
+        detail: `${video.sessionTitle} - ${video.attendance.length} students detected`,
+        time: new Date(video.processedAt).toLocaleString(),
+      }))
+    }
+
+    return sessions.slice(0, 3).map((session) => ({
+      event: 'Session ready',
+      detail: `${session.title} - ${session.enrolled} enrolled`,
+      time: session.date,
+    }))
+  }, [processedVideos, sessions])
 
   useEffect(() => {
     const userData = localStorage.getItem('user')

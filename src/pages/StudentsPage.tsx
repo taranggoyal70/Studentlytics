@@ -2,9 +2,8 @@ import { motion } from 'framer-motion'
 import { Search, Plus, Eye, Mail, BarChart3, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getAllStudents, addStudent } from '../services/api'
-import { realStudents } from '../data/transformStudents'
 import {
   BarChart,
   Bar,
@@ -15,16 +14,6 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts'
-
-const weeklyActivity = [
-  { day: 'Mon', sessions: 12, students: 285 },
-  { day: 'Tue', sessions: 15, students: 310 },
-  { day: 'Wed', sessions: 13, students: 295 },
-  { day: 'Thu', sessions: 14, students: 305 },
-  { day: 'Fri', sessions: 11, students: 270 },
-  { day: 'Sat', sessions: 6, students: 150 },
-  { day: 'Sun', sessions: 3, students: 80 },
-]
 
 interface StudentRecord {
   record_id: string
@@ -43,180 +32,48 @@ interface StudentRecord {
   topic: string
 }
 
-// Load CSV data
-async function loadCSVData(): Promise<StudentRecord[]> {
-  try {
-    const response = await fetch('/student.csv')
-    const text = await response.text()
-    const lines = text.split('\n')
-    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
-    
-    const data: StudentRecord[] = []
-    for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue
-      const values = parseCSVLine(lines[i])
-      const record: any = {}
-      headers.forEach((header, index) => {
-        const value = values[index]
-        if (['attendance', 'engagement', 'grade', 'speaking_time'].includes(header)) {
-          record[header] = parseFloat(value)
-        } else {
-          record[header] = value
-        }
-      })
-      data.push(record)
-    }
-    return data
-  } catch (error) {
-    console.error('Error loading CSV:', error)
-    return []
-  }
-}
-
-function parseCSVLine(line: string): string[] {
-  const result: string[] = []
-  let current = ''
-  let inQuotes = false
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (char === '"') {
-      inQuotes = !inQuotes
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim())
-      current = ''
-    } else {
-      current += char
-    }
-  }
-  result.push(current.trim())
-  return result
-}
-
 const getStatusColor = (attendance: number) => {
   if (attendance >= 80) return 'bg-green-100 text-green-800 border-green-200'
   if (attendance >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
   return 'bg-red-100 text-red-800 border-red-200'
 }
 
+function normalizeStudent(student: any): StudentRecord {
+  return {
+    record_id: student.record_id ?? `local#${student.student_id ?? student.id}`,
+    attendance: Number(student.attendance ?? student.attendanceRate ?? 0),
+    class_name: student.class_name ?? student.class ?? student.major ?? '',
+    department: student.department ?? student.university ?? '',
+    engagement: Number(student.engagement ?? student.engagementScore ?? 0),
+    grade: Number(student.grade ?? 0),
+    photo_url: student.photo_url ?? student.picture ?? '',
+    session_date: student.session_date ?? student.enrollmentDate ?? '',
+    speaking_time: Number(student.speaking_time ?? 0),
+    student_email: student.student_email ?? student.email ?? '',
+    student_id: student.student_id ?? student.id ?? '',
+    student_name: student.student_name ?? student.name ?? '',
+    teacher_name: student.teacher_name ?? 'HighView Staff',
+    topic: student.topic ?? student.cohort ?? '',
+  }
+}
+
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterClass, setFilterClass] = useState('all')
-  const [apiStudents, setApiStudents] = useState<any[]>([])
+  const [apiStudents, setApiStudents] = useState<StudentRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch students from API on component mount
   useEffect(() => {
     const fetchStudents = async () => {
       try {
         setLoading(true)
-        // Use real student data from students.json
-        const transformedStudents = realStudents.map(student => ({
-          student_id: student.id,
-          student_name: student.name,
-          student_email: student.email,
-          class_name: student.major,
-          attendance: student.attendanceRate,
-          engagement: student.engagementScore,
-          grade: Math.round(student.gpa * 25), // Convert GPA to percentage
-          teacher_name: 'HighView Staff',
-          session_date: student.enrollmentDate,
-          photo_url: student.picture,
-          department: student.university,
-          topic: student.cohort,
-          speaking_time: Math.round(student.sessionsAttended * 10),
-          record_id: `${student.id}_${student.name.replace(/\s/g, '_')}`
-        }))
-        console.log('Loaded real students:', transformedStudents)
-        setApiStudents(transformedStudents)
+        const students = await getAllStudents()
+        setApiStudents(students.map(normalizeStudent))
         setError(null)
       } catch (err) {
-        console.error('Error loading students:', err)
-        // Use real data as fallback
-        const mockStudents = [
-          {
-            student_id: '10001',
-            student_name: 'Student 10001',
-            student_email: 'student10001@university.edu',
-            class_name: 'Quantum Mechanics',
-            attendance: 90.8,
-            engagement: 65.6,
-            grade: 71,
-            teacher_name: 'Dr. Brown',
-            session_date: '2025-09-26',
-            photo_url: '👨‍🎓',
-            department: 'Mathematics',
-            topic: 'Algorithm Design',
-            speaking_time: 119,
-            record_id: 'record_test001#10001'
-          },
-          {
-            student_id: '10011',
-            student_name: 'Student 10011',
-            student_email: 'student10011@university.edu',
-            class_name: 'Organic Chemistry',
-            attendance: 80.9,
-            engagement: 78.1,
-            grade: 76,
-            teacher_name: 'Prof. Davis',
-            session_date: '2025-10-25',
-            photo_url: '👩‍🎓',
-            department: 'Biology',
-            topic: 'Algorithm Design',
-            speaking_time: 64,
-            record_id: 'record_test001#10011'
-          },
-          {
-            student_id: '10018',
-            student_name: 'Student 10018',
-            student_email: 'student10018@university.edu',
-            class_name: 'Statistics 101',
-            attendance: 97.1,
-            engagement: 78.7,
-            grade: 95,
-            teacher_name: 'Dr. Johnson',
-            session_date: '2025-10-26',
-            photo_url: '👨‍🎓',
-            department: 'Biology',
-            topic: 'Chemical Bonding',
-            speaking_time: 68,
-            record_id: 'record_test018#10018'
-          },
-          {
-            student_id: '10007',
-            student_name: 'Student 10007',
-            student_email: 'student10007@university.edu',
-            class_name: 'Statistics 101',
-            attendance: 64.5,
-            engagement: 74.3,
-            grade: 86,
-            teacher_name: 'Dr. Brown',
-            session_date: '2025-10-11',
-            photo_url: '👨‍🎓',
-            department: 'Engineering',
-            topic: 'Newtonian Mechanics',
-            speaking_time: 80,
-            record_id: 'record_test007#10007'
-          },
-          {
-            student_id: '10020',
-            student_name: 'Student 10020',
-            student_email: 'student10020@university.edu',
-            class_name: 'General Chemistry',
-            attendance: 62.1,
-            engagement: 63.7,
-            grade: 86,
-            teacher_name: 'Prof. Davis',
-            session_date: '2025-10-22',
-            photo_url: '👩‍🎓',
-            department: 'Biology',
-            topic: 'Wave Physics',
-            speaking_time: 96,
-            record_id: 'record_test020#10020'
-          }
-        ]
-        setApiStudents(mockStudents)
-        setError(null)
+        setApiStudents([])
+        setError(err instanceof Error ? err.message : 'Unable to load students')
       } finally {
         setLoading(false)
       }
@@ -225,29 +82,50 @@ export default function StudentsPage() {
     fetchStudents()
   }, [])
 
-  // Handler for adding a new student
   const handleAddStudent = async () => {
+    const studentName = window.prompt('Student full name')
+    if (!studentName) return
+    const studentId = window.prompt('Student ID')
+    if (!studentId) return
+    const studentEmail = window.prompt('Student email') ?? ''
+    const className = window.prompt('Class name') ?? ''
+
     try {
-      const newStudent = {
-        id: "S124",
-        name: "Alice Johnson",
-        email: "alice@university.edu",
-        class_id: "COEN233",
-        class_name: "Networking"
-      }
-      const result = await addStudent(newStudent)
-      console.log('Student added:', result)
-      // Refresh the student list
+      await addStudent({
+        student_id: studentId,
+        student_name: studentName,
+        student_email: studentEmail,
+        class_name: className,
+        attendance: 0,
+        engagement: 0,
+        grade: 0,
+        session_date: new Date().toISOString().slice(0, 10),
+      })
       const data = await getAllStudents()
-      setApiStudents(data)
+      setApiStudents(data.map(normalizeStudent))
+      setError(null)
     } catch (err) {
-      console.error('Error adding student:', err)
-      alert('Failed to add student')
+      setError(err instanceof Error ? err.message : 'Failed to add student')
     }
   }
 
-  // Combine API students with mock students, prioritize API data
-  const allStudents = apiStudents.length > 0 ? apiStudents : []
+  const allStudents = apiStudents
+
+  const classOptions = useMemo(() => (
+    [...new Set(allStudents.map(student => student.class_name).filter(Boolean))]
+  ), [allStudents])
+
+  const weeklyActivity = useMemo(() => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+    return days.map((day, index) => {
+      const dayStudents = allStudents.filter((_, studentIndex) => studentIndex % days.length === index)
+      return {
+        day,
+        sessions: new Set(dayStudents.map(student => student.class_name)).size,
+        students: dayStudents.length,
+      }
+    })
+  }, [allStudents])
   
   const filteredStudents = allStudents.filter((student: any) => {
     const name = student.student_name || student.name || ''
@@ -292,7 +170,7 @@ export default function StudentsPage() {
           {/* Error State - Subtle warning */}
           {error && (
             <div className="mb-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
-              <span>⚠️ {error} • Showing demo data</span>
+              <span>{error}. Start the local backend to load the roster.</span>
             </div>
           )}
 
@@ -300,7 +178,7 @@ export default function StudentsPage() {
           {!loading && apiStudents.length > 0 && (
             <div className="mb-4 flex items-center gap-2 text-sm text-green-600">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-              <span>Connected to AWS DynamoDB • {apiStudents.length} record(s) loaded</span>
+              <span>Connected to local roster • {apiStudents.length} record(s) loaded</span>
             </div>
           )}
 
@@ -323,9 +201,9 @@ export default function StudentsPage() {
                 className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Classes</option>
-                <option value="CS 301">CS 301</option>
-                <option value="Math 101">Math 101</option>
-                <option value="Physics 202">Physics 202</option>
+                {classOptions.map(className => (
+                  <option key={className} value={className}>{className}</option>
+                ))}
               </select>
             </div>
           </Card>
@@ -459,7 +337,7 @@ export default function StudentsPage() {
           {/* Pagination */}
           <div className="flex items-center justify-between mt-6">
             <p className="text-sm text-muted-foreground">
-              Showing {filteredStudents.length} of {allStudents.length} students {apiStudents.length > 0 && '(from database)'}
+              Showing {filteredStudents.length} of {allStudents.length} students {apiStudents.length > 0 && '(from local roster)'}
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled>

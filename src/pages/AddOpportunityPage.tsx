@@ -4,9 +4,12 @@ import { motion } from 'framer-motion'
 import { ArrowLeft, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { opportunityService, Opportunity } from '@/services/opportunityService'
 
 export default function AddOpportunityPage() {
   const navigate = useNavigate()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     title: '',
     company: '',
@@ -21,12 +24,24 @@ export default function AddOpportunityPage() {
     isPaid: false,
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Here you would save to backend
-    console.log('Saving opportunity:', formData)
-    alert('Opportunity added successfully!')
-    navigate('/explore')
+    setSaving(true)
+    setError(null)
+
+    try {
+      await opportunityService.create({
+        ...formData,
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+        spots: formData.spots ? Number(formData.spots) : undefined,
+        status: 'New',
+      } as Omit<Opportunity, 'id'>)
+      navigate('/explore')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save opportunity')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -62,6 +77,11 @@ export default function AddOpportunityPage() {
               <CardDescription>Create a new opportunity for students to explore</CardDescription>
             </CardHeader>
             <CardContent>
+              {error && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                  {error}. Start the local backend and try again.
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Title */}
                 <div>
@@ -240,10 +260,11 @@ export default function AddOpportunityPage() {
                 <div className="flex gap-4 pt-4">
                   <Button
                     type="submit"
+                    disabled={saving}
                     className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    Add Opportunity
+                    {saving ? 'Saving...' : 'Add Opportunity'}
                   </Button>
                   <Button
                     type="button"

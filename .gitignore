@@ -46,6 +46,8 @@ aws-exports.js
 
 # Private student data (keep on localhost only)
 src/data/students.json
+backend/data/students.json
+backend/data/opportunities.json
 
 # Backend runtime data (large video files / compiled bytecode)
 backend/data/videos/

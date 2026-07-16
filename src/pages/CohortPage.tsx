@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Download, Search, ChevronDown, X } from 'lucide-react'
+import { Download, Search, ChevronDown } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { cohortStudents, realStudents } from '../data/transformStudents'
 
-// ── Real data from students.json ──────────────────────────────────────────────
+// ── Real data derived from checked-in semester records ────────────────────────
 
 const SEMESTERS = ['Spring 2026', 'Fall 2025', 'Summer 2025', 'Spring 2025']
 
@@ -231,7 +231,6 @@ export default function CohortPage() {
     const expCompleted = realStudents.filter(s => s.sessionsAttended >= 3).length
     const expInProgress = realStudents.filter(s => s.sessionsAttended > 0 && s.sessionsAttended < 3).length
     const expNotStarted = realStudents.filter(s => s.sessionsAttended === 0).length
-    const maxSessions = Math.max(...realStudents.map(s => s.totalSessions), 1)
     const expScore = total > 0
       ? Math.round(realStudents.reduce((sum, s) => sum + (s.totalSessions > 0 ? (s.sessionsAttended / s.totalSessions) * 100 : 0), 0) / total)
       : 0

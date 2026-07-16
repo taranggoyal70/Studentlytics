@@ -14,7 +14,7 @@ const FAQ_RESPONSES: Record<string, string> = {
   'how does it work': '🎥 HighView uses AI to automatically track attendance from classroom videos!\n\nHere\'s the process:\n1. Upload a classroom video\n2. Our face recognition AI detects and recognizes student faces\n3. We track engagement, speaking time, and attendance\n4. View results in real-time dashboards\n\nPowered by local face recognition AI and Claude AI! 🤖',
   'pricing': '💰 Simple, transparent pricing:\n\n🆓 Free Tier: Up to 100 students, 10 hours of video per month\n⭐ Pro ($49/month): Up to 500 students, unlimited video processing\n🏢 Enterprise (Custom): Unlimited students, dedicated support\n\nTry free tier - no credit card required!',
   'features': '✨ Key Features:\n\n📊 Attendance Tracking: 95%+ accuracy\n🎯 Engagement Scoring: Head orientation analysis\n🗣️ Speaking Time: Participation analytics\n🤖 AI Analytics: Ask questions about your data\n📈 Real-time Dashboards: Live updates',
-  'get started': '🚀 Getting Started is Easy!\n\n1️⃣ Sign Up: Create free account\n2️⃣ Upload Student Photos: JPG or PNG format\n3️⃣ Upload Classroom Video: MP4 format\n4️⃣ View Results: Check dashboard in 5-15 minutes\n\n📧 Need help? demo@highview.com',
+  'get started': '🚀 Getting Started is Easy!\n\n1️⃣ Sign Up: Create free account\n2️⃣ Upload Student Photos: JPG or PNG format\n3️⃣ Upload Classroom Video: MP4 format\n4️⃣ View Results: Check dashboard in 5-15 minutes\n\n📧 Need help? support@highview.com',
   'contact': '📞 Contact Us:\n\n📧 Email: support@highview.com\n💬 Live Chat: Available 9 AM - 5 PM EST\n🌐 Website: highview.com',
   'accurate': '🎯 Accuracy: 95%+ accurate\n• Face detection: 99%+ in good lighting\n• Face matching: 95%+ with quality photos\n\n💡 Depends on video quality, lighting, and clear student photos',
 }
@@ -33,7 +33,36 @@ interface Message {
   content: string
 }
 
-// AI Chatbot for Teachers (connects to AWS API)
+function getLocalAnalyticsAnswer(query: string): string {
+  const normalized = query.toLowerCase()
+  const totalStudents = realStudents.length
+  const avgAttendance = totalStudents
+    ? Math.round(realStudents.reduce((sum, student) => sum + student.attendanceRate, 0) / totalStudents)
+    : 0
+  const avgEngagement = totalStudents
+    ? Math.round(realStudents.reduce((sum, student) => sum + student.engagementScore, 0) / totalStudents)
+    : 0
+  const absentStudents = realStudents.filter(student => student.attendanceRate === 0)
+  const ranked = [...realStudents].sort((a, b) => b.engagementScore - a.engagementScore).slice(0, 5)
+
+  if (normalized.includes('absent')) {
+    return absentStudents.length
+      ? `Absent students: ${absentStudents.map(student => student.name).join(', ')}.`
+      : 'No students are currently marked fully absent in the local roster.'
+  }
+
+  if (normalized.includes('ranking') || normalized.includes('top') || normalized.includes('engagement')) {
+    return `Top engagement rankings:\n${ranked.map((student, index) => `${index + 1}. ${student.name} - ${student.engagementScore}%`).join('\n')}`
+  }
+
+  if (normalized.includes('attendance')) {
+    return `${totalStudents} students are in the local roster. Average attendance is ${avgAttendance}%.`
+  }
+
+  return `Local analytics summary: ${totalStudents} students, ${avgAttendance}% average attendance, and ${avgEngagement}% average engagement. Configure VITE_AI_CHAT_API_URL to connect an external AI assistant.`
+}
+
+// AI Chatbot for Teachers (uses configured AI API or local roster analytics)
 function TeacherAIChatbot() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
@@ -42,7 +71,7 @@ function TeacherAIChatbot() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const API_URL = 'https://o35e0gmfl8.execute-api.us-east-1.amazonaws.com/prod/chat'
+  const API_URL = import.meta.env.VITE_AI_CHAT_API_URL
 
   const suggestions = [
     'How many students attended?',
@@ -61,6 +90,12 @@ function TeacherAIChatbot() {
     setLoading(true)
 
     try {
+      if (!API_URL) {
+        const botMessage: Message = { role: 'assistant', content: getLocalAnalyticsAnswer(currentInput) }
+        setMessages(prev => [...prev, botMessage])
+        return
+      }
+
       console.log('=== CHATBOT DEBUG START ===')
       console.log('1. Sending message to API:', currentInput)
       console.log('2. API URL:', API_URL)

@@ -3,73 +3,7 @@ import { Search, MapPin, DollarSign, Users, Plus, X, Edit2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
-
-interface Opportunity {
-  id: string
-  title: string
-  company: string
-  type: 'Job shadows' | 'Micro-internships' | 'Networking' | 'Mentorship' | 'Hackathons'
-  tags: string[]
-  location: string
-  pay?: string
-  duration?: string
-  spots?: number
-  students?: number
-  deadline?: string
-  status?: 'New' | 'Closes Soon'
-  isPaid?: boolean
-}
-
-const mockOpportunities: Opportunity[] = [
-  {
-    id: '1',
-    title: 'Brand Strategy Micro-Internship',
-    company: 'Crocs Inc.',
-    type: 'Micro-internships',
-    tags: ['Marketing', '6 weeks'],
-    location: 'Remote',
-    pay: '$18/hr',
-    students: 3,
-    deadline: 'Apr 15',
-    status: 'Closes Soon',
-    isPaid: true
-  },
-  {
-    id: '2',
-    title: 'Curated Connections — Spring',
-    company: 'HighView × 8 Partners',
-    type: 'Networking',
-    tags: ['Apr 4'],
-    location: 'Virtual',
-    pay: 'Free',
-    spots: 30,
-    status: 'New',
-    isPaid: false
-  },
-  {
-    id: '3',
-    title: 'HR Job Shadow',
-    company: 'Pinnacol Assurance',
-    type: 'Job shadows',
-    tags: ['HR / People Ops', 'Half day'],
-    location: 'Denver, CO',
-    students: 1,
-    isPaid: false
-  },
-  {
-    id: '4',
-    title: 'Embedded Project Team — AI Strategy',
-    company: 'ChatWalrus',
-    type: 'Micro-internships',
-    tags: ['Tech / AI', '10 weeks'],
-    location: 'Hybrid',
-    pay: '$20/hr',
-    students: 4,
-    deadline: 'May 1',
-    status: 'Closes Soon',
-    isPaid: true
-  }
-]
+import { opportunityService, Opportunity } from '@/services/opportunityService'
 
 const filterOptions = ['All', 'Job shadows', 'Micro-internships', 'Networking', 'Mentorship', 'Hackathons'] as const
 
@@ -78,7 +12,9 @@ export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<typeof filterOptions[number]>('All')
   const [userRole, setUserRole] = useState<'teacher' | 'student'>('student')
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null)
   const [formData, setFormData] = useState<Partial<Opportunity>>({
@@ -100,6 +36,16 @@ export default function OpportunitiesPage() {
       const user = JSON.parse(userData)
       setUserRole(user.type || 'student')
     }
+
+    opportunityService.list()
+      .then((data) => {
+        setOpportunities(data)
+        setError(null)
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Unable to load opportunities')
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   // Get filter options based on user role
@@ -200,6 +146,18 @@ export default function OpportunitiesPage() {
           </button>
         </div>
 
+        {error && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+            {error}. Start the local backend to load live opportunity data.
+          </div>
+        )}
+
+        {loading && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-gray-500">
+            Loading opportunities...
+          </div>
+        )}
+
         {/* Opportunities List */}
         <div className="space-y-4">
           {filteredOpportunities.map((opportunity) => (
@@ -299,9 +257,13 @@ export default function OpportunitiesPage() {
           ))}
         </div>
 
-        {filteredOpportunities.length === 0 && (
+        {!loading && filteredOpportunities.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No opportunities found matching your search.</p>
+            <p className="text-gray-500 text-lg">
+              {opportunities.length === 0
+                ? 'No opportunities have been created yet.'
+                : 'No opportunities found matching your search.'}
+            </p>
           </div>
         )}
       </div>
@@ -340,23 +302,23 @@ export default function OpportunitiesPage() {
               {editingOpportunity ? 'Edit Opportunity' : 'Add New Opportunity'}
             </h2>
 
-            <form onSubmit={(e) => {
+            <form onSubmit={async (e) => {
               e.preventDefault()
               
-              if (editingOpportunity) {
-                // Update existing opportunity
-                setOpportunities(opportunities.map(opp => 
-                  opp.id === editingOpportunity.id 
-                    ? { ...formData, id: editingOpportunity.id } as Opportunity
-                    : opp
-                ))
-              } else {
-                // Add new opportunity
-                const newOpportunity: Opportunity = {
-                  ...formData,
-                  id: Date.now().toString(),
-                } as Opportunity
-                setOpportunities([newOpportunity, ...opportunities])
+              try {
+                if (editingOpportunity) {
+                  const updated = await opportunityService.update(editingOpportunity.id, formData)
+                  setOpportunities(opportunities.map(opp => 
+                    opp.id === editingOpportunity.id ? updated : opp
+                  ))
+                } else {
+                  const created = await opportunityService.create(formData as Omit<Opportunity, 'id'>)
+                  setOpportunities([created, ...opportunities])
+                }
+                setError(null)
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Unable to save opportunity')
+                return
               }
               
               setModalOpen(false)

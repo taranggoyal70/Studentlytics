@@ -9,6 +9,7 @@ import json
 import uuid
 import time
 import logging
+import csv
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -17,36 +18,43 @@ import subprocess
 import tempfile
 import threading
 
-import cv2
-import numpy as np
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import aiofiles
 
 # Import auth router
 from auth import router as auth_router
 
-# Optional face recognition imports
-try:
-    import face_recognition
-    from faster_whisper import WhisperModel
-    FACE_RECOGNITION_AVAILABLE = True
-except ImportError:
-    FACE_RECOGNITION_AVAILABLE = False
-    logger.warning("Face recognition not available. Install face_recognition_models to enable.")
-
 # ── Setup ──────────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("studentlytics")
 
+# Optional face recognition imports
+try:
+    import cv2
+    import numpy as np
+    import face_recognition
+    from faster_whisper import WhisperModel
+    VIDEO_PROCESSING_AVAILABLE = True
+except ImportError as exc:
+    cv2 = None
+    np = None
+    face_recognition = None
+    WhisperModel = None
+    VIDEO_PROCESSING_AVAILABLE = False
+    logger.warning("Video processing dependencies are not available: %s", exc)
+
 BASE_DIR = Path(__file__).parent
+DATA_DIR = BASE_DIR / "data"
 PHOTOS_DIR = BASE_DIR / "data" / "student_photos"
 VIDEOS_DIR = BASE_DIR / "data" / "videos"
 RESULTS_DIR = BASE_DIR / "data" / "results"
 ENCODINGS_FILE = BASE_DIR / "data" / "face_encodings.json"
+STUDENTS_FILE = BASE_DIR / "data" / "students.json"
+OPPORTUNITIES_FILE = BASE_DIR / "data" / "opportunities.json"
+PUBLIC_STUDENT_CSV = BASE_DIR.parent / "public" / "student.csv"
 
-for d in [PHOTOS_DIR, VIDEOS_DIR, RESULTS_DIR]:
+for d in [DATA_DIR, PHOTOS_DIR, VIDEOS_DIR, RESULTS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Studentlytics API", version="1.0.0")
@@ -65,9 +73,55 @@ app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
 # { video_id: { status, progress, result, error } }
 processing_jobs: dict = {}
 
+# ── Local JSON-backed application data ────────────────────────────────────────
+def _read_json_file(path: Path, default):
+    if not path.exists():
+        return default
+    with open(path) as f:
+        return json.load(f)
+
+
+def _write_json_file(path: Path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def _seed_students_from_csv() -> list[dict]:
+    if not PUBLIC_STUDENT_CSV.exists():
+        return []
+
+    with open(PUBLIC_STUDENT_CSV, newline="") as f:
+        reader = csv.DictReader(f)
+        return list(reader)
+
+
+def load_students() -> list[dict]:
+    if not STUDENTS_FILE.exists():
+        students = _seed_students_from_csv()
+        _write_json_file(STUDENTS_FILE, students)
+        return students
+    return _read_json_file(STUDENTS_FILE, [])
+
+
+def save_students(students: list[dict]):
+    _write_json_file(STUDENTS_FILE, students)
+
+
+def load_opportunities() -> list[dict]:
+    if not OPPORTUNITIES_FILE.exists():
+        _write_json_file(OPPORTUNITIES_FILE, [])
+    return _read_json_file(OPPORTUNITIES_FILE, [])
+
+
+def save_opportunities(opportunities: list[dict]):
+    _write_json_file(OPPORTUNITIES_FILE, opportunities)
+
 # ── Face encoding store ────────────────────────────────────────────────────────
 def load_encodings() -> dict:
     """Load saved face encodings from disk."""
+    if not VIDEO_PROCESSING_AVAILABLE:
+        return {}
+
     if ENCODINGS_FILE.exists():
         with open(ENCODINGS_FILE) as f:
             raw = json.load(f)
@@ -83,6 +137,9 @@ def load_encodings() -> dict:
 
 def save_encodings(encodings: dict):
     """Save face encodings to disk."""
+    if not VIDEO_PROCESSING_AVAILABLE:
+        raise RuntimeError("Video processing dependencies are not installed")
+
     serializable = {
         sid: {
             "name": data["name"],
@@ -106,6 +163,116 @@ def health():
     }
 
 
+@app.get("/students")
+def list_students():
+    """Return the local student roster used by the dashboard."""
+    return load_students()
+
+
+@app.get("/students/records/{student_id}")
+def get_student(student_id: str):
+    """Return one student by student_id or record_id."""
+    for student in load_students():
+        if student.get("student_id") == student_id or student.get("record_id") == student_id:
+            return student
+    raise HTTPException(404, f"Student {student_id} not found")
+
+
+@app.post("/students")
+def create_student(student: dict = Body(...)):
+    """Create a student in the local roster."""
+    students = load_students()
+    student_id = student.get("student_id") or student.get("id")
+    if not student_id:
+        raise HTTPException(400, "student_id is required")
+
+    if any(s.get("student_id") == student_id for s in students):
+        raise HTTPException(409, f"Student {student_id} already exists")
+
+    normalized = {
+        **student,
+        "student_id": student_id,
+        "student_name": student.get("student_name") or student.get("name") or student_id,
+        "student_email": student.get("student_email") or student.get("email") or "",
+        "record_id": student.get("record_id") or f"local#{student_id}",
+    }
+    students.append(normalized)
+    save_students(students)
+    return normalized
+
+
+@app.put("/students/records/{student_id}")
+def update_student(student_id: str, updates: dict = Body(...)):
+    """Update a student in the local roster."""
+    students = load_students()
+    for index, student in enumerate(students):
+        if student.get("student_id") == student_id or student.get("record_id") == student_id:
+            updated = {**student, **updates}
+            students[index] = updated
+            save_students(students)
+            return updated
+    raise HTTPException(404, f"Student {student_id} not found")
+
+
+@app.delete("/students/records/{student_id}")
+def delete_student(student_id: str):
+    """Delete a student from the local roster."""
+    students = load_students()
+    remaining = [
+        student for student in students
+        if student.get("student_id") != student_id and student.get("record_id") != student_id
+    ]
+    if len(remaining) == len(students):
+        raise HTTPException(404, f"Student {student_id} not found")
+    save_students(remaining)
+    return {"deleted": student_id}
+
+
+@app.get("/opportunities")
+def list_opportunities():
+    """Return opportunities created by staff."""
+    return load_opportunities()
+
+
+@app.post("/opportunities")
+def create_opportunity(opportunity: dict = Body(...)):
+    """Create a staff-managed opportunity."""
+    opportunities = load_opportunities()
+    new_opportunity = {
+        **opportunity,
+        "id": opportunity.get("id") or str(uuid.uuid4())[:8],
+        "created_at": opportunity.get("created_at") or datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    opportunities.insert(0, new_opportunity)
+    save_opportunities(opportunities)
+    return new_opportunity
+
+
+@app.put("/opportunities/{opportunity_id}")
+def update_opportunity(opportunity_id: str, updates: dict = Body(...)):
+    """Update a staff-managed opportunity."""
+    opportunities = load_opportunities()
+    for index, opportunity in enumerate(opportunities):
+        if opportunity.get("id") == opportunity_id:
+            updated = {**opportunity, **updates, "id": opportunity_id, "updated_at": datetime.utcnow().isoformat()}
+            opportunities[index] = updated
+            save_opportunities(opportunities)
+            return updated
+    raise HTTPException(404, f"Opportunity {opportunity_id} not found")
+
+
+@app.delete("/opportunities/{opportunity_id}")
+def delete_opportunity(opportunity_id: str):
+    """Delete a staff-managed opportunity."""
+    opportunities = load_opportunities()
+    remaining = [opportunity for opportunity in opportunities if opportunity.get("id") != opportunity_id]
+    if len(remaining) == len(opportunities):
+        raise HTTPException(404, f"Opportunity {opportunity_id} not found")
+    save_opportunities(remaining)
+    return {"deleted": opportunity_id}
+
+
 @app.post("/students/photo")
 async def upload_student_photo(
     file: UploadFile = File(...),
@@ -116,6 +283,9 @@ async def upload_student_photo(
     Upload a student photo and index their face for attendance tracking.
     Supports multiple photos per student to improve accuracy.
     """
+    if not VIDEO_PROCESSING_AVAILABLE:
+        raise HTTPException(503, "Video processing dependencies are not installed. Run: pip install -r backend/requirements.txt")
+
     if not file.content_type.startswith("image/"):
         raise HTTPException(400, "File must be an image")
 
@@ -175,6 +345,9 @@ async def upload_video(
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Upload a classroom video and start processing."""
+    if not VIDEO_PROCESSING_AVAILABLE:
+        raise HTTPException(503, "Video processing dependencies are not installed. Run: pip install -r backend/requirements.txt")
+
     if not file.content_type.startswith("video/"):
         raise HTTPException(400, "File must be a video")
 
@@ -231,7 +404,10 @@ def list_videos():
 _whisper_model = None
 _whisper_lock = threading.Lock()
 
-def get_whisper_model() -> WhisperModel:
+def get_whisper_model():
+    if not VIDEO_PROCESSING_AVAILABLE or WhisperModel is None:
+        raise RuntimeError("Video processing dependencies are not installed")
+
     global _whisper_model
     with _whisper_lock:
         if _whisper_model is None:

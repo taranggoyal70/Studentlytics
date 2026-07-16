@@ -1,4 +1,4 @@
-import studentsData from './students.json'
+import { spring2026Students, spring2026Attendance } from './semesterData'
 
 export interface RealStudent {
   id: string
@@ -67,6 +67,10 @@ function getLastActive(attendanceRate: number): string {
   return '2 weeks ago'
 }
 
+function getStudentAttendanceRecord(studentId: string) {
+  return spring2026Attendance.find(record => record.studentId === studentId)
+}
+
 export function transformToCohortStudent(student: RealStudent): CohortStudent {
   return {
     id: student.id,
@@ -84,13 +88,10 @@ export function transformToCohortStudent(student: RealStudent): CohortStudent {
     major: student.major,
     note: student.gpa >= 3.5 ? 'High performer' : '',
     eventsAttended: Math.floor(student.sessionsAttended * 0.6),
-    applications: Math.floor(Math.random() * 5),
+    applications: Math.max(0, Math.floor(student.sessionsAttended / 3)),
     mentorSessions: Math.floor(student.sessionsAttended * 0.4),
-    jobShadows: Math.floor(Math.random() * 3),
-    opportunities: [
-      { title: 'Curated Connections — Spring', subtitle: 'Networking • Apr 4' },
-      { title: 'Crocs Micro-Internship', subtitle: 'Marketing • Closes Apr 15' }
-    ],
+    jobShadows: Math.max(0, Math.floor(student.sessionsAttended / 5)),
+    opportunities: [],
     staffNotes: [
       { 
         text: `Enrolled in ${student.cohort}. Major: ${student.major}`, 
@@ -101,5 +102,28 @@ export function transformToCohortStudent(student: RealStudent): CohortStudent {
   }
 }
 
-export const realStudents: RealStudent[] = studentsData as RealStudent[]
+export const realStudents: RealStudent[] = spring2026Students.map((student) => {
+  const attendanceRecord = getStudentAttendanceRecord(student.studentId)
+  const sessionsAttended = Math.round((student.attendanceRate / 100) * 12)
+  const emailName = student.name.toLowerCase().replace(/\s+/g, '.')
+
+  return {
+    id: student.studentId,
+    name: student.name,
+    email: `${emailName}@university.edu`,
+    phone: '',
+    university: 'HighView Partner University',
+    major: attendanceRecord?.sessionName ?? 'Spring 2026 Program',
+    expectedGraduation: 2026 + (Number(student.id) % 4),
+    cohort: student.semester,
+    enrollmentDate: attendanceRecord?.date ?? '2026-01-12',
+    status: student.engagementScore >= 75 && student.attendanceRate >= 75 ? 'Active' : 'At Risk',
+    attendanceRate: student.attendanceRate,
+    engagementScore: student.engagementScore,
+    sessionsAttended,
+    totalSessions: 12,
+    gpa: Math.round((student.totalPoints / 400) * 10) / 10,
+    picture: '',
+  }
+})
 export const cohortStudents: CohortStudent[] = realStudents.map(transformToCohortStudent)
