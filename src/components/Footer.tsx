@@ -43,7 +43,7 @@ export default function Footer() {
               <span className="text-xl font-bold text-white">Studentlytics</span>
             </Link>
             <p className="text-slate-400 mb-6 max-w-sm">
-              AI attendance and engagement tracking for universities and cohort programs. Local processing, zero cloud dependency, FERPA compliant.
+              AI attendance, engagement, and check-in/out intelligence for classrooms, webinars, conferences, and company training.
             </p>
             <div className="flex gap-4">
               {socialLinks.map((social) => (

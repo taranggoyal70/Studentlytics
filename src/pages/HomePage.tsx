@@ -11,21 +11,21 @@ import { realStudents } from '../data/transformStudents'
 
 // FAQ Responses
 const FAQ_RESPONSES: Record<string, string> = {
-  'how does it work': '🎥 Studentlytics uses AI to automatically track attendance from classroom videos!\n\nHere\'s the process:\n1. Upload a classroom video\n2. Our face recognition AI detects and recognizes student faces\n3. We track engagement, speaking time, and attendance\n4. View results in real-time dashboards\n\nPowered by local face recognition AI and Claude AI! 🤖',
-  'pricing': '💰 Simple, transparent pricing:\n\n🆓 Free Tier: Up to 100 students, 10 hours of video per month\n⭐ Pro ($49/month): Up to 500 students, unlimited video processing\n🏢 Enterprise (Custom): Unlimited students, dedicated support\n\nTry free tier - no credit card required!',
-  'features': '✨ Key Features:\n\n📊 Attendance Tracking: 95%+ accuracy\n🎯 Engagement Scoring: Head orientation analysis\n🗣️ Speaking Time: Participation analytics\n🤖 AI Analytics: Ask questions about your data\n📈 Real-time Dashboards: Live updates',
-  'get started': '🚀 Getting Started is Easy!\n\n1️⃣ Sign Up: Create free account\n2️⃣ Upload Student Photos: JPG or PNG format\n3️⃣ Upload Classroom Video: MP4 format\n4️⃣ View Results: Check dashboard in 5-15 minutes\n\n📧 Need help? support@studentlytics.ai',
-  'contact': '📞 Contact Us:\n\n📧 Email: support@studentlytics.ai\n💬 Live Chat: Available 9 AM - 5 PM EST\n🌐 Website: studentlytics.ai',
-  'accurate': '🎯 Accuracy: 95%+ accurate\n• Face detection: 99%+ in good lighting\n• Face matching: 95%+ with quality photos\n\n💡 Depends on video quality, lighting, and clear student photos',
+  'how does it work': 'Studentlytics analyzes a classroom, webinar, conference, or training recording.\n\n1. Enroll known participants with approved photos\n2. Upload a session recording\n3. Face recognition identifies who attended\n4. The system creates check-in/check-out timelines\n5. Audio and visual signals generate engagement and participation scores',
+  'pricing': 'Simple pricing direction:\n\nFree pilot: small roster and limited processing\nTeam: departments, cohorts, and company training\nEnterprise: universities, conferences, SSO, retention controls, and integrations\n\nFinal pricing should be based on seats, processed hours, and compliance needs.',
+  'features': 'Key features:\n\nAttendance from face recognition\nCheck-in and check-out timestamps\nEarly-leave detection\nEngagement scoring\nCamera-off participation support\nOrganizer, admin, and participant dashboards',
+  'get started': 'Getting started:\n\n1. Create an organizer account\n2. Add a roster or attendee list\n3. Enroll participant photos with consent\n4. Upload a recording from class, Zoom, Meet, webinar, or event\n5. Review attendance, engagement, and drop-off reports',
+  'contact': 'Contact:\n\nEmail: support@studentlytics.ai\nWebsite: studentlytics.ai',
+  'accurate': 'Accuracy depends on roster quality, consented reference photos, camera angle, lighting, and video resolution. Studentlytics should always show confidence and evidence, and organizers should be able to override decisions with an audit trail.',
 }
 
 const quickQuestions = [
-  '🎥 How does it work?',
-  '💰 What are the pricing plans?',
-  '✨ What features do you offer?',
-  '🚀 How do I get started?',
-  '🎯 How accurate is it?',
-  '📧 How can I contact support?'
+  'How does it work?',
+  'What are the pricing plans?',
+  'What features do you offer?',
+  'How do I get started?',
+  'How accurate is it?',
+  'How can I contact support?'
 ]
 
 interface Message {
@@ -66,7 +66,7 @@ function getLocalAnalyticsAnswer(query: string): string {
 function TeacherAIChatbot() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '👋 Hi! I\'m your AI assistant. Ask me about attendance, engagement, or student analytics!' }
+    { role: 'assistant', content: 'Hi, I can answer questions about attendance, engagement, check-ins, early departures, and participant analytics.' }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -74,9 +74,9 @@ function TeacherAIChatbot() {
   const API_URL = import.meta.env.VITE_AI_CHAT_API_URL
 
   const suggestions = [
-    'How many students attended?',
+    'How many people attended?',
     'Show engagement rankings',
-    'Who was absent?',
+    'Who left early?',
     'What was the average attendance score?'
   ]
 

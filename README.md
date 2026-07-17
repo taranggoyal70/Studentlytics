@@ -1,20 +1,21 @@
 # Studentlytics
 
-**AI-powered attendance and engagement tracking for universities and cohort programs.**
+**AI-powered attendance, engagement, and check-in/check-out tracking for classrooms, webinars, conferences, and company training.**
 
-Upload a classroom recording. Get per-student attendance, engagement scores, and participation data — automatically, with no hardware changes and no behavior change from instructors.
+Upload a classroom, webinar, conference, or training recording. Get per-person attendance, engagement scores, participation data, and session timelines automatically.
 
 ---
 
 ## What It Does
 
-Studentlytics processes classroom video recordings using face recognition and audio transcription to produce:
+Studentlytics processes session recordings using face recognition and audio transcription to produce:
 
 - **Attendance records** — who was present, confirmed by face recognition (95%+ accuracy)
+- **Check-in/check-out timelines** — first seen, last seen, total visible time, and early-leave detection
 - **Engagement scores** — multi-factor score per student: visual presence + verbal participation + interaction quality + consistency
 - **Participation data** — words spoken, questions asked, camera-on time per student
 - **Camera-off detection** — students speaking with camera off are marked present, not absent
-- **At-risk alerts** — students who attend but never participate are flagged before they drop out
+- **At-risk alerts** — participants who attend but never participate, arrive late, or leave early are flagged
 
 Processing a 60-minute class recording takes ~15 minutes. No cloud APIs. $0/video processing cost.
 
@@ -22,21 +23,21 @@ Processing a 60-minute class recording takes ~15 minutes. No cloud APIs. $0/vide
 
 ## The Problem
 
-US universities lose ~15% of students to dropout each semester. By the time an instructor notices declining attendance, the student is already gone. Manual roll calls take 5-10 minutes of class time, produce no engagement data, and are easily gamed. LMS login logs tell you nothing about whether a student was actually paying attention.
+Universities, companies, and event teams still rely on manual roll calls, meeting attendance exports, badge scans, or memory. Those methods miss the real story: who arrived late, who left early, who was camera-off but participating, and who attended without engaging.
 
-The data to catch at-risk students early exists — it's sitting in every institution's recording archive. Studentlytics makes it actionable.
+The data already exists in session recordings and live calls. Studentlytics makes it actionable.
 
 ---
 
 ## Architecture
 
 ```
-Video Recording (MP4/MOV/Zoom)
+Session Recording (MP4/MOV/WebM/Zoom/Meet export)
          │
          ▼
 ┌─────────────────────────────────┐
 │      FastAPI Backend            │
-│   (runs on-campus, local only)  │
+│  (customer-controlled runtime) │
 │                                 │
 │  ┌──────────────┐  ┌─────────┐  │
 │  │ Face         │  │ Audio   │  │  ← runs in parallel
@@ -54,7 +55,7 @@ Video Recording (MP4/MOV/Zoom)
          │
          ▼
    React Dashboard
-   (attendance, engagement, at-risk)
+   (attendance, engagement, timelines)
 ```
 
 **No student biometric data ever leaves the institution's network.** All face encodings and video processing run locally. FERPA and BIPA compliant by architecture.
@@ -70,7 +71,8 @@ Video Recording (MP4/MOV/Zoom)
 | Parallel audio thread | Audio transcription runs concurrently with face processing → 40% faster total processing |
 | Adaptive detection scale | Full-res for ≤720px video (virtual meetings). 0.5x for 1280px. Prevents missing faces in small grid-view tiles. |
 | Proportional speech attribution | Grid meetings (multiple faces visible) → speech distributed by each student's camera-on time fraction |
-| 20% presence threshold | Student marked present if detected in ≥20% of sampled frames. Handles momentary frame drops. |
+| Presence timeline extraction | First seen, last seen, visible duration, left-early flag, and multiple presence windows are emitted per participant. |
+| 20% presence threshold | Participant marked present if detected in ≥20% of sampled frames. Handles momentary frame drops. |
 
 ---
 
@@ -86,7 +88,11 @@ consistency   = 0.02 if (camera_on AND zero words)                  [10%]
 engagement_score = (visual + participation + interaction + consistency) × 100
 ```
 
-Camera-off students who speak >50 words are marked `present_camera_off` with a reduced score (no visual component).
+Camera-off participants who speak >50 words are marked `present_camera_off` with a reduced score (no visual component).
+
+## Platform Blueprint
+
+See [docs/PLATFORM_BLUEPRINT.md](./docs/PLATFORM_BLUEPRINT.md) for the broader product architecture: classrooms, live calls, webinars, conferences, company training, participant timelines, consent, and the live-session roadmap.
 
 ---
 
@@ -172,7 +178,9 @@ All processing is local. See [YC_PRIVACY_COMPLIANCE.md](./YC_PRIVACY_COMPLIANCE.
 ## Roadmap
 
 - [ ] LMS integration: Canvas, Blackboard, Google Classroom (attendance sync)
-- [ ] Live video stream support (RTSP / Zoom SDK)
+- [ ] Session timeline UI: check-in, check-out, visible duration, early leave, re-entry windows
+- [ ] Live video stream support (RTSP / Zoom / Google Meet / Teams adapters)
+- [ ] Organization and workspace model for universities, companies, and event teams
 - [ ] Email alerts for at-risk students (configurable thresholds)
 - [ ] Multi-session trend view per student
 - [ ] Export to CSV / PDF for institutional reporting

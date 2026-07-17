@@ -11,6 +11,11 @@ export interface AttendanceResult {
   studentName: string
   confidence: number
   timestamp: string
+  checkInAt: string | null
+  checkOutAt: string | null
+  durationPresentSeconds: number
+  leftEarly: boolean
+  returnedAfterLeave: boolean
   present: boolean
   status: 'present' | 'present_camera_off'
   wordCount: number
@@ -89,6 +94,16 @@ interface LocalResult {
       interaction: number
       consistency: number
     }
+    check_in_at?: string | null
+    check_out_at?: string | null
+    duration_present_seconds?: number
+    left_early?: boolean
+    returned_after_leave?: boolean
+    presence_windows?: {
+      start: string
+      end: string
+      duration_seconds: number
+    }[]
   }[]
   absent_students: {
     student_id: string
@@ -114,6 +129,11 @@ function mapToVideoAnalysisResult(job: LocalJobStatus): VideoAnalysisResult {
         studentName: s.name,
         confidence: Math.round(s.presence_ratio * 100),
         timestamp: r.processed_at,
+        checkInAt: s.check_in_at ?? null,
+        checkOutAt: s.check_out_at ?? null,
+        durationPresentSeconds: s.duration_present_seconds ?? 0,
+        leftEarly: s.left_early ?? false,
+        returnedAfterLeave: s.returned_after_leave ?? false,
         present: true,
         status: s.status,
         wordCount: s.word_count ?? 0,

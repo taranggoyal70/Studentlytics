@@ -534,6 +534,66 @@ def attribute_speech(
     }
 
 
+def _format_session_time(seconds: float) -> str:
+    total = max(0, int(round(seconds)))
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+def _merge_presence_windows(windows: list[tuple[float, float]], max_gap_seconds: float = 6.0) -> list[tuple[float, float]]:
+    if not windows:
+        return []
+
+    ordered = sorted((max(0.0, start), max(0.0, end)) for start, end in windows if end > start)
+    if not ordered:
+        return []
+
+    merged = [ordered[0]]
+    for start, end in ordered[1:]:
+        last_start, last_end = merged[-1]
+        if start - last_end <= max_gap_seconds:
+            merged[-1] = (last_start, max(last_end, end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def build_presence_timeline(windows: list[tuple[float, float]], duration_sec: float) -> dict:
+    merged = _merge_presence_windows(windows)
+    if not merged:
+        return {
+            "check_in_at": None,
+            "check_out_at": None,
+            "duration_present_seconds": 0,
+            "left_early": False,
+            "returned_after_leave": False,
+            "presence_windows": [],
+        }
+
+    total_visible = round(sum(end - start for start, end in merged), 1)
+    first_seen = merged[0][0]
+    last_seen = merged[-1][1]
+    early_leave_threshold = max(300, duration_sec * 0.1)
+
+    return {
+        "check_in_at": _format_session_time(first_seen),
+        "check_out_at": _format_session_time(last_seen),
+        "duration_present_seconds": total_visible,
+        "left_early": last_seen < max(0, duration_sec - early_leave_threshold),
+        "returned_after_leave": len(merged) > 1,
+        "presence_windows": [
+            {
+                "start": _format_session_time(start),
+                "end": _format_session_time(end),
+                "duration_seconds": round(end - start, 1),
+            }
+            for start, end in merged
+        ],
+    }
+
+
 # ── Core video processing ──────────────────────────────────────────────────────
 
 def process_video(video_id: str, video_path: Path, session_title: str):
@@ -722,6 +782,7 @@ def process_video(video_id: str, video_path: Path, session_title: str):
             audio_stats = audio_data["per_student"].get(sid, {})
             word_count = audio_stats.get("word_count", 0)
             questions_asked = audio_stats.get("questions_asked", 0)
+            timeline = build_presence_timeline(face_windows.get(sid, []), duration_sec)
 
             if sid in student_presence and len(student_presence[sid]) > 0:
                 scores = student_presence[sid]
@@ -758,6 +819,7 @@ def process_video(video_id: str, video_path: Path, session_title: str):
                         "presence_ratio": round(presence_ratio, 3),
                         "engagement_score": engagement_score,
                         "status": "present",
+                        **timeline,
                         "word_count": word_count,
                         "questions_asked": questions_asked,
                         "camera_on": True,
@@ -774,6 +836,7 @@ def process_video(video_id: str, video_path: Path, session_title: str):
                         "name": sdata["name"],
                         "frames_detected": frames_present,
                         "status": "absent",
+                        **timeline,
                     })
             elif word_count > 50:
                 # Camera never visible but spoke enough to be considered present
@@ -790,6 +853,12 @@ def process_video(video_id: str, video_path: Path, session_title: str):
                     "presence_ratio": 0,
                     "engagement_score": engagement_score,
                     "status": "present_camera_off",
+                    "check_in_at": None,
+                    "check_out_at": None,
+                    "duration_present_seconds": 0,
+                    "left_early": False,
+                    "returned_after_leave": False,
+                    "presence_windows": [],
                     "word_count": word_count,
                     "questions_asked": questions_asked,
                     "camera_on": False,
@@ -800,6 +869,12 @@ def process_video(video_id: str, video_path: Path, session_title: str):
                     "name": sdata["name"],
                     "frames_detected": 0,
                     "status": "absent",
+                    "check_in_at": None,
+                    "check_out_at": None,
+                    "duration_present_seconds": 0,
+                    "left_early": False,
+                    "returned_after_leave": False,
+                    "presence_windows": [],
                 })
 
         # Merge camera-off speakers into present list

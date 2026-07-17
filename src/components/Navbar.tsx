@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GraduationCap, Menu, X, Users, User, LogOut, UserCircle, Settings } from 'lucide-react'
+import { ScanFace, Menu, X, Users, User, LogOut, UserCircle, Settings } from 'lucide-react'
 import { Button } from './ui/button'
 
 const studentNavItems = [
@@ -65,15 +65,15 @@ export default function Navbar() {
             <div className="flex items-center gap-3">
               {/* Circle Logo */}
               <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
-                <GraduationCap className="h-8 w-8 text-white" />
+                <ScanFace className="h-8 w-8 text-white" />
               </div>
               {/* Company Name & Tagline */}
               <div className="flex flex-col">
                 <span className="text-xl font-bold text-primary">
-                  HIGHVIEW
+                  Studentlytics
                 </span>
                 <span className="text-xs text-muted-foreground italic">
-                  Student Engagement Platform
+                  Presence Intelligence Platform
                 </span>
               </div>
             </div>

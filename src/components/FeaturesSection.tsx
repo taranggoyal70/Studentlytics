@@ -1,42 +1,54 @@
 import { motion } from 'framer-motion'
-import { Clock, BarChart3, Brain, LayoutDashboard, TrendingUp, Bell } from 'lucide-react'
+import { Clock, BarChart3, Brain, LayoutDashboard, TrendingUp, Bell, LogOut, Video } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 const features = [
   {
     icon: Clock,
-    title: 'Real-Time Attendance',
-    description: 'Automated attendance tracking with QR codes and facial recognition. Mark attendance in seconds with 95%+ accuracy.',
+    title: 'Automatic Attendance',
+    description: 'Identify enrolled participants from recordings and mark who attended without roll call, QR scans, or manual spreadsheets.',
     gradient: 'from-blue-500 to-cyan-500',
   },
   {
+    icon: LogOut,
+    title: 'Check-In and Check-Out',
+    description: 'Capture when each person first appears, when they leave, how long they stayed, and whether they left early and never returned.',
+    gradient: 'from-emerald-500 to-teal-500',
+  },
+  {
     icon: BarChart3,
-    title: 'Engagement Analytics',
-    description: 'Track student participation, questions asked, and interaction patterns. Get detailed insights into classroom dynamics.',
+    title: 'Engagement Scoring',
+    description: 'Score focus and participation from visual presence, speaking activity, questions, consistency, and camera-off participation.',
     gradient: 'from-purple-500 to-pink-500',
+  },
+  {
+    icon: Video,
+    title: 'Classroom, Webinar, Conference',
+    description: 'Use the same workflow for university classes, corporate training, workshops, meetups, and recorded online sessions.',
+    gradient: 'from-indigo-500 to-blue-500',
   },
   {
     icon: Brain,
     title: 'AI-Powered Insights',
-    description: 'Predictive analytics using machine learning to identify at-risk students and recommend interventions early.',
+    description: 'Ask which participants were absent, who disengaged, who arrived late, and which sessions need follow-up.',
     gradient: 'from-orange-500 to-red-500',
   },
   {
     icon: LayoutDashboard,
     title: 'Multi-Role Dashboards',
-    description: 'Customized dashboards for teachers, students, and administrators. Each role gets relevant data and controls.',
+    description: 'Dedicated views for professors, trainers, organizers, administrators, and participants with permissioned data access.',
     gradient: 'from-green-500 to-emerald-500',
   },
   {
     icon: TrendingUp,
-    title: 'Performance Tracking',
-    description: 'Monitor academic progress with correlation between attendance, engagement, and grades. Visualize trends over time.',
+    title: 'Cohort and Event Trends',
+    description: 'Track attendance, engagement, and drop-off patterns across courses, events, departments, or company programs.',
     gradient: 'from-indigo-500 to-blue-500',
   },
   {
     icon: Bell,
-    title: 'Instant Notifications',
-    description: 'Real-time alerts for low attendance, engagement drops, and important updates. Stay connected with push notifications.',
+    title: 'Early Risk Alerts',
+    description: 'Flag repeat absences, late arrivals, early departures, and low-engagement participants before problems become invisible.',
     gradient: 'from-yellow-500 to-orange-500',
   },
 ]
@@ -53,10 +65,10 @@ export default function FeaturesSection() {
           className="text-center mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Powerful Features for Modern Education
+            Built for Any Learning or Event Room
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Everything you need to transform your classroom into a data-driven learning environment
+            Automatic attendance, engagement, and session timelines for universities, companies, webinars, and conferences
           </p>
         </motion.div>
 

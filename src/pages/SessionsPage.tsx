@@ -9,9 +9,9 @@ import { addToCalendar } from '../utils/calendarUtils'
 import { realStudents } from '../data/transformStudents'
 
 const quickActions = [
-  { title: 'Upload Recording', description: 'Process a new class video', icon: Upload, action: 'upload' },
-  { title: 'View Analytics', description: 'Check attendance trends', icon: Brain, action: 'analytics' },
-  { title: 'Manage Students', description: 'Update student roster', icon: Users, action: 'students' },
+  { title: 'Upload Recording', description: 'Analyze a class, webinar, or event video', icon: Upload, action: 'upload' },
+  { title: 'View Analytics', description: 'Check attendance, engagement, and drop-off trends', icon: Brain, action: 'analytics' },
+  { title: 'Manage Participants', description: 'Update roster and face enrollment', icon: Users, action: 'students' },
 ]
 
 export default function SessionsPage() {
@@ -151,7 +151,7 @@ export default function SessionsPage() {
       >
         <h1 className="text-4xl font-bold mb-4">Sessions</h1>
         <p className="text-xl text-muted-foreground mb-12">
-          {userRole === 'student' ? 'Upcoming learning sessions and workshops' : 'Manage sessions and track attendance'}
+          {userRole === 'student' ? 'Upcoming learning sessions and workshops' : 'Upload recordings and track attendance, engagement, and early departures'}
         </p>
 
         {/* STUDENT VIEW - Live Sessions Table */}
@@ -447,7 +447,7 @@ export default function SessionsPage() {
                     <div className="border-t px-5 pb-5 pt-4">
                       {video.attendance.length > 0 ? (
                         <div className="space-y-2">
-                          <p className="text-sm font-semibold mb-3 text-green-700">Present Students</p>
+                          <p className="text-sm font-semibold mb-3 text-green-700">Present Participants</p>
                           {video.attendance.map((s) => (
                             <div key={s.studentId} className={`p-3 rounded-lg border ${s.cameraOn === false ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-100'}`}>
                               <div className="flex items-center justify-between mb-1">
@@ -460,12 +460,18 @@ export default function SessionsPage() {
                                   {s.cameraOn === false && (
                                     <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">camera off</span>
                                   )}
+                                  {s.leftEarly && (
+                                    <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded">left early</span>
+                                  )}
                                 </div>
                                 <span className="text-xs font-semibold text-primary">{s.engagementScore}% engaged</span>
                               </div>
                               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
+                                {s.checkInAt && <span>in {s.checkInAt}</span>}
+                                {s.checkOutAt && <span>out {s.checkOutAt}</span>}
                                 {s.wordCount > 0 && <span>{s.wordCount} words</span>}
                                 {s.questionsAsked > 0 && <span>{s.questionsAsked} question{s.questionsAsked !== 1 ? 's' : ''}</span>}
+                                {s.returnedAfterLeave && <span>returned after leaving</span>}
                               </div>
                             </div>
                           ))}
@@ -501,7 +507,7 @@ export default function SessionsPage() {
               <X className="h-5 w-5" />
             </button>
 
-            <h2 className="text-2xl font-bold mb-1">Upload Class Recording</h2>
+            <h2 className="text-2xl font-bold mb-1">Upload Session Recording</h2>
             <p className="text-sm text-muted-foreground mb-6">{selectedSession}</p>
 
             {result ? (
@@ -517,7 +523,7 @@ export default function SessionsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-4 bg-muted/40 rounded-lg text-center">
                     <p className="text-3xl font-bold text-primary">{result.attendance.length}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Students Present</p>
+                    <p className="text-sm text-muted-foreground mt-1">People Present</p>
                   </div>
                   <div className="p-4 bg-muted/40 rounded-lg text-center">
                     <p className="text-3xl font-bold text-purple-600">
@@ -529,7 +535,7 @@ export default function SessionsPage() {
 
                 {result.attendance.length > 0 ? (
                   <div>
-                    <p className="text-sm font-semibold mb-2">Detected Students</p>
+                    <p className="text-sm font-semibold mb-2">Detected Participants</p>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {result.attendance.map((s) => (
                         <div key={s.studentId} className={`p-2 rounded border ${s.cameraOn === false ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-100'}`}>
@@ -543,13 +549,19 @@ export default function SessionsPage() {
                               {s.cameraOn === false && (
                                 <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">camera off</span>
                               )}
+                              {s.leftEarly && (
+                                <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded">left early</span>
+                              )}
                             </div>
                             <span className="text-xs font-semibold text-primary">{s.engagementScore}%</span>
                           </div>
-                          {(s.wordCount > 0 || s.questionsAsked > 0) && (
-                            <div className="flex gap-3 text-xs text-muted-foreground mt-1 ml-6">
+                          {(s.checkInAt || s.checkOutAt || s.wordCount > 0 || s.questionsAsked > 0) && (
+                            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1 ml-6">
+                              {s.checkInAt && <span>in {s.checkInAt}</span>}
+                              {s.checkOutAt && <span>out {s.checkOutAt}</span>}
                               {s.wordCount > 0 && <span>{s.wordCount} words</span>}
                               {s.questionsAsked > 0 && <span>{s.questionsAsked} question{s.questionsAsked !== 1 ? 's' : ''}</span>}
+                              {s.returnedAfterLeave && <span>returned after leaving</span>}
                             </div>
                           )}
                         </div>
@@ -559,7 +571,7 @@ export default function SessionsPage() {
                 ) : (
                   <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg text-sm text-amber-700">
                     <AlertCircle className="h-4 w-4 shrink-0" />
-                    No enrolled students detected. Upload student photos in the Students page first.
+                    No enrolled participants detected. Upload participant photos in the Students page first.
                   </div>
                 )}
 
@@ -595,7 +607,7 @@ export default function SessionsPage() {
                           <span className="cursor-pointer">Browse Files</span>
                         </Button>
                       </label>
-                      <p className="text-xs text-muted-foreground">MP4, MOV, AVI supported</p>
+                      <p className="text-xs text-muted-foreground">MP4, MOV, AVI, or exported meeting recordings supported</p>
                     </div>
                   )}
                 </div>
