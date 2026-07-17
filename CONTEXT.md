@@ -48,6 +48,10 @@ _Avoid_: Focus score, performance score
 The observable facts behind an attendance decision or engagement score, such as first seen, last seen, duration, words spoken, questions asked, confidence, and presence windows.
 _Avoid_: Black-box AI result
 
+**Organizer**:
+A person who runs spaces and sessions inside their organization: creates sessions, uploads recordings, manages the roster, and reviews reports. Every account that signs up as an organizer owns its own organization.
+_Avoid_: Teacher as the default term, staff
+
 **Face Template**:
 The stored biometric encoding derived from a participant's enrollment photo, used only to verify presence in sessions the participant consented to. It is sensitive personal data, never demo content, and never belongs in version control.
 _Avoid_: Face encoding file, extracted face
