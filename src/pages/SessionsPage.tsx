@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button'
 import { videoService, VideoUploadProgress, VideoAnalysisResult } from '../services/videoService'
 import { addToCalendar } from '../utils/calendarUtils'
-import { realStudents } from '../data/transformStudents'
+import { listSessions, SessionSummary } from '../services/insightsService'
 import { getClerkRole } from '../auth/clerk'
 
 const quickActions = [
@@ -29,34 +29,37 @@ export default function SessionsPage() {
   const [result, setResult] = useState<VideoAnalysisResult | null>(null)
   const [processedVideos, setProcessedVideos] = useState<VideoAnalysisResult[]>([])
   const [expandedVideo, setExpandedVideo] = useState<string | null>(null)
-  const [calendarDropdownOpen, setCalendarDropdownOpen] = useState<number | null>(null)
+  const [calendarDropdownOpen, setCalendarDropdownOpen] = useState<string | null>(null)
+  const [apiSessions, setApiSessions] = useState<SessionSummary[]>([])
+  const [sessionsError, setSessionsError] = useState<string | null>(null)
   const { user } = useUser()
   const userRole = getClerkRole(user) === 'student' ? 'student' : 'teacher'
 
-  // Generate sessions from real student data
+  // Real sessions from the API. Empty until the organization has sessions.
+  useEffect(() => {
+    listSessions()
+      .then((data) => setApiSessions(data))
+      .catch((error) => setSessionsError(error instanceof Error ? error.message : 'Failed to load sessions'))
+  }, [])
+
   const sessions = useMemo(() => {
-    const majors = [...new Set(realStudents.map(s => s.major))].slice(0, 3)
-    const dates = ['Oct 28, 2025', 'Oct 30, 2025', 'Nov 2, 2025']
-    const times = ['2:00 PM - 4:00 PM', '10:00 AM - 11:30 AM', '3:00 PM - 5:00 PM']
-    const types = ['Virtual', 'Virtual', 'In-Person']
-    
-    return majors.map((major, index) => {
-      const studentsInMajor = realStudents.filter(s => s.major === major)
-      const enrolled = studentsInMajor.length
-      const rsvps = Math.floor(enrolled * 0.85)
-      
+    return apiSessions.map((s) => {
+      const starts = s.starts_at ? new Date(s.starts_at) : null
+      const ends = s.ends_at ? new Date(s.ends_at) : null
       return {
-        id: index + 1,
-        title: `${major} Workshop`,
-        date: dates[index],
-        time: times[index],
-        type: types[index] as 'Virtual' | 'In-Person',
-        instructor: 'Studentlytics Staff',
-        enrolled,
-        rsvps,
+        id: s.id,
+        title: s.title,
+        date: starts ? starts.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unscheduled',
+        time: starts
+          ? `${starts.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${ends ? ` - ${ends.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}`
+          : '—',
+        type: (s.kind === 'in-person' ? 'In-Person' : 'Virtual') as 'Virtual' | 'In-Person',
+        instructor: s.space_name,
+        enrolled: s.roster_count,
+        rsvps: s.recording_count,
       }
     })
-  }, [])
+  }, [apiSessions])
 
   const recentActivities = useMemo(() => {
     if (processedVideos.length > 0) {
@@ -150,6 +153,19 @@ export default function SessionsPage() {
         <p className="text-xl text-muted-foreground mb-12">
           {userRole === 'student' ? 'Upcoming sessions and your attendance record' : 'Upload recordings and track attendance, engagement, and early departures'}
         </p>
+
+        {sessionsError && (
+          <Card className="mb-8 border-destructive/50">
+            <CardContent className="pt-6 text-sm text-destructive">{sessionsError}</CardContent>
+          </Card>
+        )}
+        {!sessionsError && sessions.length === 0 && (
+          <Card className="mb-8">
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              No sessions yet. {userRole === 'student' ? 'Sessions will appear here once your organizer schedules them.' : 'Upload a recording or create a session to get started.'}
+            </CardContent>
+          </Card>
+        )}
 
         {/* PARTICIPANT VIEW - Session table */}
         {userRole === 'student' && (

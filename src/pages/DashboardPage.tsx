@@ -1,14 +1,9 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  Activity,
-  AlertTriangle,
   ArrowRight,
-  CheckCircle2,
-  Database,
   FileVideo,
-  LockKeyhole,
-  ScanFace,
   ShieldCheck,
   TimerReset,
   Upload,
@@ -17,13 +12,7 @@ import {
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { getApiEndpoint } from '../config/api'
-
-const readiness = [
-  { label: 'Authentication', value: 'Connected through Clerk', icon: LockKeyhole, state: 'ready' },
-  { label: 'API endpoint', value: 'Set VITE_API_ENDPOINT in Vercel', icon: Activity, state: 'blocked' },
-  { label: 'Database', value: 'Production persistence required', icon: Database, state: 'blocked' },
-  { label: 'Processing runtime', value: 'Deploy customer-controlled backend', icon: ScanFace, state: 'blocked' },
-]
+import { getOverview, AnalyticsOverview } from '../services/insightsService'
 
 const reportPreview = [
   { label: 'Attendance decisions', value: 'Present, absent, late, left early' },
@@ -34,6 +23,22 @@ const reportPreview = [
 
 export default function DashboardPage() {
   const apiConnected = Boolean(getApiEndpoint())
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
+  const [overviewError, setOverviewError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getOverview()
+      .then(setOverview)
+      .catch((error) => setOverviewError(error instanceof Error ? error.message : 'Failed to load overview'))
+  }, [])
+
+  const stats = [
+    { label: 'Participants', value: overview ? String(overview.participants) : '—' },
+    { label: 'Sessions', value: overview ? String(overview.sessions) : '—' },
+    { label: 'Analyses completed', value: overview ? String(overview.analyses_completed) : '—' },
+    { label: 'Attendance rate', value: overview?.attendance_rate != null ? `${overview.attendance_rate}%` : 'No data yet' },
+    { label: 'Average engagement', value: overview?.average_engagement != null ? `${overview.average_engagement}` : 'No data yet' },
+  ]
 
   return (
     <div className="min-h-screen bg-[#f4f5f1] text-slate-950">
@@ -69,29 +74,22 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <ShieldCheck className="h-5 w-5 text-emerald-700" />
-                Startup readiness
+                Organization overview
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {readiness.map((item) => {
-                const ready = item.state === 'ready' || (item.label === 'API endpoint' && apiConnected)
-                return (
-                  <div key={item.label} className="flex items-start justify-between gap-4 border border-slate-200 p-4">
-                    <div className="flex gap-3">
-                      <item.icon className="mt-0.5 h-5 w-5 text-slate-700" />
-                      <div>
-                        <p className="font-semibold">{item.label}</p>
-                        <p className="mt-1 text-sm text-slate-500">{ready && item.label === 'API endpoint' ? 'Configured' : item.value}</p>
-                      </div>
-                    </div>
-                    {ready ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    ) : (
-                      <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    )}
-                  </div>
-                )
-              })}
+              {overviewError && <p className="text-sm text-destructive">{overviewError}</p>}
+              {stats.map((item) => (
+                <div key={item.label} className="flex items-start justify-between gap-4 border border-slate-200 p-4">
+                  <p className="font-semibold">{item.label}</p>
+                  <p className="text-sm text-slate-600">{item.value}</p>
+                </div>
+              ))}
+              {overview && overview.sessions === 0 && (
+                <p className="text-sm text-slate-500">
+                  No sessions yet — upload a recording from the Sessions page to produce your first attendance report.
+                </p>
+              )}
             </CardContent>
           </Card>
 

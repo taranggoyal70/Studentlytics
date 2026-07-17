@@ -1,203 +1,235 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, Users, CheckCircle, XCircle, Clock, Download, Search } from 'lucide-react'
+import { Calendar, CheckCircle, XCircle, Clock, Search } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { SemesterSelector } from '@/components/SemesterSelector'
-import { useSemester } from '@/contexts/SemesterContext'
-import { getAttendanceBySemester } from '@/data/semesterData'
+import {
+  listSessions,
+  getSessionReport,
+  SessionSummary,
+  AttendanceDecision,
+} from '../services/insightsService'
+
+function formatSeconds(seconds: number | null): string {
+  if (seconds == null) return '—'
+  const total = Math.max(0, Math.round(seconds))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  present: 'bg-green-100 text-green-800',
+  camera_off_present: 'bg-emerald-50 text-emerald-700',
+  late: 'bg-yellow-100 text-yellow-800',
+  left_early: 'bg-amber-100 text-amber-800',
+  absent: 'bg-red-100 text-red-800',
+  unknown: 'bg-slate-100 text-slate-600',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  present: 'Present',
+  camera_off_present: 'Present (camera off)',
+  late: 'Late',
+  left_early: 'Left early',
+  absent: 'Absent',
+  unknown: 'Unknown',
+}
 
 export default function AttendancePage() {
-  const { selectedSemester } = useSemester()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'present' | 'absent'>('all')
+  const [sessions, setSessions] = useState<SessionSummary[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [decisions, setDecisions] = useState<AttendanceDecision[]>([])
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Get semester-specific attendance data
-  const semesterAttendance = useMemo(() => {
-    return getAttendanceBySemester(selectedSemester.id)
-  }, [selectedSemester.id])
+  useEffect(() => {
+    listSessions()
+      .then((data) => {
+        setSessions(data)
+        const analyzed = data.find((s) => s.latest_job_status === 'completed')
+        if (analyzed) setSelectedId(analyzed.id)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load sessions'))
+      .finally(() => setLoading(false))
+  }, [])
 
-  // Calculate accurate attendance stats from actual attendance records
-  const attendanceStats = useMemo(() => {
-    const totalStudents = semesterAttendance.length
-    const presentCount = semesterAttendance.filter(r => r.status === 'present').length
-    const absentCount = semesterAttendance.filter(r => r.status === 'absent').length
-    
-    // Calculate attendance rate: present / total * 100
-    const attendanceRate = totalStudents > 0 
-      ? Math.round((presentCount / totalStudents) * 100)
-      : 0
-    
-    return [
-      { label: 'Total People', value: totalStudents.toString(), icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100' },
-      { label: 'Present Today', value: presentCount.toString(), icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
-      { label: 'Absent Today', value: absentCount.toString(), icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100' },
-      { label: 'Attendance Rate', value: `${attendanceRate}%`, icon: Calendar, color: 'text-purple-600', bgColor: 'bg-purple-100' }
-    ]
-  }, [semesterAttendance])
+  useEffect(() => {
+    if (!selectedId) return
+    setReportLoading(true)
+    getSessionReport(selectedId)
+      .then((report) => setDecisions(report.decisions))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load report'))
+      .finally(() => setReportLoading(false))
+  }, [selectedId])
 
-  const filteredData = semesterAttendance.filter(record => {
-    const matchesSearch = record.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.studentId.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterStatus === 'all' || record.status === filterStatus
-    return matchesSearch && matchesFilter
-  })
+  const filtered = useMemo(
+    () =>
+      decisions.filter(
+        (d) =>
+          d.participant_name.toLowerCase().includes(search.toLowerCase()) ||
+          d.external_id.toLowerCase().includes(search.toLowerCase())
+      ),
+    [decisions, search]
+  )
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'present': return 'bg-green-100 text-green-800'
-      case 'absent': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
+  const attended = decisions.filter((d) => d.status !== 'absent' && d.status !== 'unknown')
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="container mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Attendance Timeline</h1>
-              <p className="text-muted-foreground">Track check-ins, check-outs, duration, and absences across sessions</p>
-            </div>
-            <SemesterSelector />
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Viewing data for: <span className="font-semibold text-foreground">{selectedSemester.name}</span>
-          </div>
-        </div>
+    <div className="container mx-auto px-4 py-12">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <h1 className="text-4xl font-bold mb-2">Attendance</h1>
+        <p className="text-xl text-muted-foreground mb-10">
+          Attendance decisions and presence evidence per session, produced by recording analysis.
+        </p>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {attendanceStats.map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-            >
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{stat.value}</div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+        {loading && <p className="text-muted-foreground">Loading sessions…</p>}
+        {error && <p className="text-destructive mb-6">{error}</p>}
 
-        {/* Attendance Table */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <CardTitle>Attendance Records</CardTitle>
-                <CardDescription>Review participant presence for the latest processed sessions</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </div>
+        {!loading && sessions.length === 0 && (
+          <Card>
+            <CardContent className="pt-6 text-muted-foreground">
+              No sessions yet. Upload a session recording to generate attendance decisions.
+            </CardContent>
+          </Card>
+        )}
 
-            {/* Search and Filter */}
-            <div className="flex flex-col md:flex-row gap-4 mt-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {sessions.length > 0 && (
+          <>
+            <div className="mb-8 flex flex-wrap items-center gap-3">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              <select
+                className="rounded-md border bg-background px-3 py-2 text-sm"
+                value={selectedId ?? ''}
+                onChange={(e) => setSelectedId(e.target.value || null)}
+              >
+                <option value="">Select a session…</option>
+                {sessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                    {s.latest_job_status ? ` (${s.latest_job_status})` : ' (not analyzed)'}
+                  </option>
+                ))}
+              </select>
+              <div className="relative ml-auto">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name or participant ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  placeholder="Search participants…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 w-64"
                 />
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={filterStatus === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterStatus('all')}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={filterStatus === 'present' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterStatus('present')}
-                >
-                  Present
-                </Button>
-                <Button
-                  variant={filterStatus === 'absent' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterStatus('absent')}
-                >
-                  Absent
-                </Button>
-              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4 font-medium">Participant</th>
-                    <th className="text-left p-4 font-medium">Participant ID</th>
-                    <th className="text-left p-4 font-medium">Session</th>
-                    <th className="text-left p-4 font-medium">Check In</th>
-                    <th className="text-left p-4 font-medium">Check Out</th>
-                    <th className="text-left p-4 font-medium">Duration</th>
-                    <th className="text-left p-4 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.map((record) => (
-                    <motion.tr
-                      key={record.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="border-b hover:bg-muted/50 transition-colors"
-                    >
-                      <td className="p-4">
-                        <div className="font-medium">{record.studentName}</div>
-                      </td>
-                      <td className="p-4 text-muted-foreground">{record.studentId}</td>
-                      <td className="p-4 text-sm">{record.sessionName}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{record.checkIn}</span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{record.checkOut || '-'}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm">{record.duration}</td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
-                          {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                        </span>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            {selectedId == null && (
+              <Card>
+                <CardContent className="pt-6 text-muted-foreground">
+                  Select a session to view its attendance report.
+                </CardContent>
+              </Card>
+            )}
+
+            {selectedId != null && !reportLoading && decisions.length === 0 && (
+              <Card>
+                <CardContent className="pt-6 text-muted-foreground">
+                  No attendance decisions for this session yet — the analysis may still be queued or processing.
+                </CardContent>
+              </Card>
+            )}
+
+            {decisions.length > 0 && (
+              <>
+                <div className="grid gap-4 md:grid-cols-3 mb-8">
+                  <Card>
+                    <CardContent className="pt-6 flex items-center gap-3">
+                      <CheckCircle className="h-8 w-8 text-green-600" />
+                      <div>
+                        <p className="text-2xl font-bold">{attended.length}</p>
+                        <p className="text-sm text-muted-foreground">Attended</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 flex items-center gap-3">
+                      <XCircle className="h-8 w-8 text-red-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{decisions.length - attended.length}</p>
+                        <p className="text-sm text-muted-foreground">Absent</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 flex items-center gap-3">
+                      <Clock className="h-8 w-8 text-amber-500" />
+                      <div>
+                        <p className="text-2xl font-bold">
+                          {decisions.filter((d) => d.left_early || d.returned_after_leave).length}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Left early / re-entered</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Attendance decisions</CardTitle>
+                    <CardDescription>
+                      Check-in and check-out derive from the first and last presence window; re-entries are preserved.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="py-2 pr-4">Participant</th>
+                          <th className="py-2 pr-4">Decision</th>
+                          <th className="py-2 pr-4">Check-in</th>
+                          <th className="py-2 pr-4">Check-out</th>
+                          <th className="py-2 pr-4">Visible time</th>
+                          <th className="py-2 pr-4">Presence windows</th>
+                          <th className="py-2 pr-4">Words</th>
+                          <th className="py-2">Engagement</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((d) => (
+                          <tr key={d.id} className="border-b last:border-0">
+                            <td className="py-3 pr-4">
+                              <p className="font-medium">{d.participant_name}</p>
+                              <p className="text-xs text-muted-foreground">{d.external_id}</p>
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[d.status] ?? STATUS_STYLES.unknown}`}>
+                                {STATUS_LABELS[d.status] ?? d.status}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4">{formatSeconds(d.check_in_seconds)}</td>
+                            <td className="py-3 pr-4">{formatSeconds(d.check_out_seconds)}</td>
+                            <td className="py-3 pr-4">{formatSeconds(d.duration_present_seconds)}</td>
+                            <td className="py-3 pr-4">
+                              {d.presence_windows.length}
+                              {d.returned_after_leave && (
+                                <span className="ml-1 text-xs text-amber-600">(re-entered)</span>
+                              )}
+                            </td>
+                            <td className="py-3 pr-4">{d.word_count}</td>
+                            <td className="py-3">{d.engagement_score ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </>
+        )}
+      </motion.div>
     </div>
   )
 }
