@@ -47,7 +47,7 @@ export default function StudentLoginPage() {
           <div className="mb-8">
             <Link to="/" className="flex items-center gap-2 mb-6">
               <GraduationCap className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">HighView</span>
+              <span className="text-2xl font-bold">Studentlytics</span>
             </Link>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">

@@ -47,8 +47,6 @@ export default function AttendanceTrackingPage() {
         record.id === id ? { ...record, status: newStatus } : record
       )
     )
-    // Auto-save to backend when status changes
-    console.log('Saving attendance record:', id)
   }
 
   return (

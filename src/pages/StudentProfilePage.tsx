@@ -61,7 +61,7 @@ export default function StudentProfilePage() {
         attendance: realStudent.sessionAttendance,
         engagement: realStudent.ai,
         grade: realStudent.experiential,
-        teacher_name: 'HighView Staff',
+        teacher_name: 'Studentlytics Staff',
         session_date: '2026-09-01',
         photo_url: `https://ui-avatars.com/api/?name=${realStudent.name.replace(' ', '+')}&background=random`,
         department: realStudent.school,

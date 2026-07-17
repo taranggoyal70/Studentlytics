@@ -52,7 +52,7 @@ function normalizeStudent(student: any): StudentRecord {
     student_email: student.student_email ?? student.email ?? '',
     student_id: student.student_id ?? student.id ?? '',
     student_name: student.student_name ?? student.name ?? '',
-    teacher_name: student.teacher_name ?? 'HighView Staff',
+    teacher_name: student.teacher_name ?? 'Studentlytics Staff',
     topic: student.topic ?? student.cohort ?? '',
   }
 }

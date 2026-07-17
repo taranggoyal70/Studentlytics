@@ -24,7 +24,7 @@ export default function DashboardPage() {
       return {
         class: major,
         subject: major.split(' ')[0],
-        teacher: 'HighView Staff',
+        teacher: 'Studentlytics Staff',
         students: studentsInMajor.length,
         engagement: avgEngagement,
       }

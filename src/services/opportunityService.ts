@@ -1,4 +1,4 @@
-import { awsConfig } from '../config/aws-config'
+import { requireApiEndpoint } from '../config/api'
 
 export interface Opportunity {
   id: string
@@ -19,10 +19,9 @@ export interface Opportunity {
   updated_at?: string
 }
 
-const API_URL = awsConfig.lambda.apiEndpoint
-
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const apiUrl = requireApiEndpoint()
+  const response = await fetch(`${apiUrl}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...(options?.headers ?? {}),

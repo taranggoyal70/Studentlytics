@@ -59,9 +59,18 @@ for d in [DATA_DIR, PHOTOS_DIR, VIDEOS_DIR, RESULTS_DIR]:
 
 app = FastAPI(title="Studentlytics API", version="1.0.0")
 
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "FRONTEND_ORIGINS",
+        "http://localhost:3006,http://127.0.0.1:3006"
+    ).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

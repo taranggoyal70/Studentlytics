@@ -1,9 +1,8 @@
-import { awsConfig } from '../config/aws-config'
-
-const API_URL = awsConfig.lambda.apiEndpoint
+import { requireApiEndpoint } from '../config/api'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const apiUrl = requireApiEndpoint()
+  const response = await fetch(`${apiUrl}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...(options?.headers ?? {}),

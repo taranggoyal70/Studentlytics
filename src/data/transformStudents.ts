@@ -112,7 +112,7 @@ export const realStudents: RealStudent[] = spring2026Students.map((student) => {
     name: student.name,
     email: `${emailName}@university.edu`,
     phone: '',
-    university: 'HighView Partner University',
+    university: 'Studentlytics Partner University',
     major: attendanceRecord?.sessionName ?? 'Spring 2026 Program',
     expectedGraduation: 2026 + (Number(student.id) % 4),
     cohort: student.semester,

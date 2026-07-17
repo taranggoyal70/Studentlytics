@@ -151,7 +151,7 @@ export default function AboutPage() {
                   {/* Main Mission Statement */}
                   <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl border">
                     <p className="text-lg leading-relaxed text-foreground">
-                      At <span className="font-bold text-primary">HighView</span>, we believe that every student deserves personalized attention and every educator deserves powerful tools to make data-driven decisions. Our mission is to bridge the gap between traditional teaching methods and modern technology by providing real-time analytics that illuminate student engagement, attendance patterns, and learning outcomes.
+                      At <span className="font-bold text-primary">Studentlytics</span>, we believe that every student deserves personalized attention and every educator deserves powerful tools to make data-driven decisions. Our mission is to bridge the gap between traditional teaching methods and modern technology by providing real-time analytics that illuminate student engagement, attendance patterns, and learning outcomes.
                     </p>
                   </div>
 

@@ -1,18 +1,20 @@
-// AWS Configuration for HighView Video Analysis
+import { getApiEndpoint } from './api'
+
+// Runtime configuration for Studentlytics.
 export const awsConfig = {
-  region: 'us-east-1', // Change to your AWS region
+  region: 'us-east-1',
   s3: {
-    bucket: 'highview-classroom-videos', // Your S3 bucket name
+    bucket: 'studentlytics-classroom-videos',
     region: 'us-east-1'
   },
   rekognition: {
     region: 'us-east-1'
   },
   lambda: {
-    videoProcessingFunction: 'highview-video-processor',
-    apiEndpoint: 'http://localhost:8000' // Local FastAPI backend
+    videoProcessingFunction: 'studentlytics-video-processor',
+    apiEndpoint: getApiEndpoint()
   }
 }
 
 // Student face collection for Rekognition
-export const FACE_COLLECTION_ID = 'highview-students'
+export const FACE_COLLECTION_ID = 'studentlytics-students'

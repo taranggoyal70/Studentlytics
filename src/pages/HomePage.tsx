@@ -11,11 +11,11 @@ import { realStudents } from '../data/transformStudents'
 
 // FAQ Responses
 const FAQ_RESPONSES: Record<string, string> = {
-  'how does it work': '🎥 HighView uses AI to automatically track attendance from classroom videos!\n\nHere\'s the process:\n1. Upload a classroom video\n2. Our face recognition AI detects and recognizes student faces\n3. We track engagement, speaking time, and attendance\n4. View results in real-time dashboards\n\nPowered by local face recognition AI and Claude AI! 🤖',
+  'how does it work': '🎥 Studentlytics uses AI to automatically track attendance from classroom videos!\n\nHere\'s the process:\n1. Upload a classroom video\n2. Our face recognition AI detects and recognizes student faces\n3. We track engagement, speaking time, and attendance\n4. View results in real-time dashboards\n\nPowered by local face recognition AI and Claude AI! 🤖',
   'pricing': '💰 Simple, transparent pricing:\n\n🆓 Free Tier: Up to 100 students, 10 hours of video per month\n⭐ Pro ($49/month): Up to 500 students, unlimited video processing\n🏢 Enterprise (Custom): Unlimited students, dedicated support\n\nTry free tier - no credit card required!',
   'features': '✨ Key Features:\n\n📊 Attendance Tracking: 95%+ accuracy\n🎯 Engagement Scoring: Head orientation analysis\n🗣️ Speaking Time: Participation analytics\n🤖 AI Analytics: Ask questions about your data\n📈 Real-time Dashboards: Live updates',
-  'get started': '🚀 Getting Started is Easy!\n\n1️⃣ Sign Up: Create free account\n2️⃣ Upload Student Photos: JPG or PNG format\n3️⃣ Upload Classroom Video: MP4 format\n4️⃣ View Results: Check dashboard in 5-15 minutes\n\n📧 Need help? support@highview.com',
-  'contact': '📞 Contact Us:\n\n📧 Email: support@highview.com\n💬 Live Chat: Available 9 AM - 5 PM EST\n🌐 Website: highview.com',
+  'get started': '🚀 Getting Started is Easy!\n\n1️⃣ Sign Up: Create free account\n2️⃣ Upload Student Photos: JPG or PNG format\n3️⃣ Upload Classroom Video: MP4 format\n4️⃣ View Results: Check dashboard in 5-15 minutes\n\n📧 Need help? support@studentlytics.ai',
+  'contact': '📞 Contact Us:\n\n📧 Email: support@studentlytics.ai\n💬 Live Chat: Available 9 AM - 5 PM EST\n🌐 Website: studentlytics.ai',
   'accurate': '🎯 Accuracy: 95%+ accurate\n• Face detection: 99%+ in good lighting\n• Face matching: 95%+ with quality photos\n\n💡 Depends on video quality, lighting, and clear student photos',
 }
 
@@ -96,10 +96,6 @@ function TeacherAIChatbot() {
         return
       }
 
-      console.log('=== CHATBOT DEBUG START ===')
-      console.log('1. Sending message to API:', currentInput)
-      console.log('2. API URL:', API_URL)
-      
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 
@@ -108,24 +104,17 @@ function TeacherAIChatbot() {
         body: JSON.stringify({ message: currentInput })
       })
 
-      console.log('3. API Response status:', response.status)
-      console.log('4. API Response headers:', Object.fromEntries(response.headers.entries()))
-
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('5. API Error response:', errorText)
         throw new Error(`API returned status ${response.status}: ${errorText}`)
       }
 
       const responseText = await response.text()
-      console.log('6. Raw API Response:', responseText)
       
       let data
       try {
         data = JSON.parse(responseText)
-        console.log('7. Parsed API Response:', data)
-      } catch (parseError) {
-        console.error('8. Failed to parse JSON:', parseError)
+      } catch {
         throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`)
       }
       
@@ -134,41 +123,25 @@ function TeacherAIChatbot() {
       
       if (data.response) {
         botResponse = data.response
-        console.log('9. Using data.response')
       } else if (data.body) {
-        console.log('10. Found data.body, parsing...')
         const bodyData = typeof data.body === 'string' ? JSON.parse(data.body) : data.body
         botResponse = bodyData.response || bodyData.message || JSON.stringify(bodyData)
       } else if (data.message) {
         botResponse = data.message
-        console.log('11. Using data.message')
       } else if (data.answer) {
         botResponse = data.answer
-        console.log('12. Using data.answer')
       } else {
-        console.log('13. No standard field found, using full data')
         botResponse = JSON.stringify(data, null, 2)
       }
-      
-      console.log('14. Final bot response:', botResponse)
-      console.log('=== CHATBOT DEBUG END ===')
       
       const botMessage: Message = { role: 'assistant', content: botResponse }
       setMessages(prev => [...prev, botMessage])
 
     } catch (error) {
-      console.error('=== CHATBOT ERROR ===')
       console.error('Error details:', error)
-      console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error)
-      if (error instanceof Error) {
-        console.error('Error message:', error.message)
-        console.error('Error stack:', error.stack)
-      }
-      console.error('=== ERROR END ===')
-      
       const errorMessage: Message = { 
         role: 'assistant', 
-        content: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\n🔍 Check browser console (F12) for detailed logs.\n\nCommon issues:\n• CORS not enabled on API\n• Wrong API endpoint\n• API not deployed` 
+        content: `I could not reach the analytics assistant: ${error instanceof Error ? error.message : 'Unknown error'}.`
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
@@ -259,7 +232,7 @@ function TeacherAIChatbot() {
 function FAQChatbot() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '👋 Hi! I can help answer common questions about HighView. What would you like to know?' }
+    { role: 'assistant', content: '👋 Hi! I can help answer common questions about Studentlytics. What would you like to know?' }
   ])
   const [input, setInput] = useState('')
 
@@ -272,7 +245,7 @@ function FAQChatbot() {
       }
     }
     
-    return `🤔 I'm not sure about that. Try asking about:\n\n${quickQuestions.slice(0, 4).map(q => `• ${q}`).join('\n')}\n\n📧 Or contact us: support@highview.com`
+    return `🤔 I'm not sure about that. Try asking about:\n\n${quickQuestions.slice(0, 4).map(q => `• ${q}`).join('\n')}\n\n📧 Or contact us: support@studentlytics.ai`
   }
 
   const sendMessage = () => {
@@ -514,7 +487,7 @@ export default function HomePage() {
             <Card className="p-6">
               <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-primary" />
-                HighView Cohort
+                Studentlytics Cohort
               </h3>
               <p className="text-muted-foreground mb-4">
                 {realStudents.length} students enrolled. Class sessions have not started yet — attendance and engagement data will populate once recordings are processed.

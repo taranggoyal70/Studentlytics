@@ -1,4 +1,4 @@
-import { awsConfig } from '../config/aws-config'
+import { requireApiEndpoint } from '../config/api'
 
 export interface VideoUploadProgress {
   loaded: number
@@ -147,10 +147,8 @@ function mapToVideoAnalysisResult(job: LocalJobStatus): VideoAnalysisResult {
 }
 
 class VideoService {
-  private apiEndpoint: string
-
-  constructor() {
-    this.apiEndpoint = awsConfig.lambda.apiEndpoint
+  private getApiEndpoint(): string {
+    return requireApiEndpoint()
   }
 
   /**
@@ -191,7 +189,7 @@ class VideoService {
         reject(new Error('Upload failed — is the backend running? (cd backend && uvicorn main:app --reload)'))
       })
 
-      xhr.open('POST', `${this.apiEndpoint}/videos/upload`)
+      xhr.open('POST', `${this.getApiEndpoint()}/videos/upload`)
       xhr.send(formData)
     })
   }
@@ -200,7 +198,7 @@ class VideoService {
    * Get video processing status
    */
   async getVideoAnalysis(videoId: string): Promise<VideoAnalysisResult> {
-    const response = await fetch(`${this.apiEndpoint}/videos/${videoId}/status`)
+    const response = await fetch(`${this.getApiEndpoint()}/videos/${videoId}/status`)
 
     if (!response.ok) {
       throw new Error('Failed to fetch video status')
@@ -255,7 +253,7 @@ class VideoService {
     formData.append('student_id', studentId)
     formData.append('student_name', studentName)
 
-    const response = await fetch(`${this.apiEndpoint}/students/photo`, {
+    const response = await fetch(`${this.getApiEndpoint()}/students/photo`, {
       method: 'POST',
       body: formData,
     })
@@ -270,7 +268,7 @@ class VideoService {
    * Get all processed videos
    */
   async getAllVideos(): Promise<VideoAnalysisResult[]> {
-    const response = await fetch(`${this.apiEndpoint}/videos`)
+    const response = await fetch(`${this.getApiEndpoint()}/videos`)
 
     if (!response.ok) {
       throw new Error('Failed to fetch videos')
@@ -284,7 +282,7 @@ class VideoService {
    * Get all enrolled students
    */
   async getEnrolledStudents(): Promise<{ studentId: string; name: string; photos: number }[]> {
-    const response = await fetch(`${this.apiEndpoint}/students/enrolled`)
+    const response = await fetch(`${this.getApiEndpoint()}/students/enrolled`)
 
     if (!response.ok) {
       throw new Error('Failed to fetch enrolled students')

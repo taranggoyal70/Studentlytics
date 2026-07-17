@@ -96,7 +96,7 @@ export default function LoginPage() {
           <div className="mb-8">
             <Link to="/" className="flex items-center gap-2 mb-6">
               <GraduationCap className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">HighView</span>
+              <span className="text-2xl font-bold">Studentlytics</span>
             </Link>
             <h1 className="text-3xl font-bold mb-2">
               {isLogin ? 'Welcome Back' : 'Create Account'}
@@ -104,7 +104,7 @@ export default function LoginPage() {
             <p className="text-muted-foreground">
               {isLogin
                 ? 'Enter your credentials to access your account'
-                : 'Sign up to get started with HighView'}
+                : 'Sign up to get started with Studentlytics'}
             </p>
           </div>
 

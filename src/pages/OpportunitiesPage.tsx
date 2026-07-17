@@ -78,7 +78,7 @@ export default function OpportunitiesPage() {
 
           {/* Navigation Tabs */}
           <div className="flex items-center gap-8 mb-6">
-            <div className="text-2xl font-bold text-gray-900">HighView</div>
+            <div className="text-2xl font-bold text-gray-900">Studentlytics</div>
             <nav className="flex gap-8">
               <a href="/" className="text-gray-600 hover:text-gray-900">Home</a>
               <a href="/explore" className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Explore</a>

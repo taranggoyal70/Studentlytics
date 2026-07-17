@@ -78,7 +78,7 @@ export function generateICSFile(event: CalendarEvent): string {
   const icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//HighView//Session Calendar//EN',
+    'PRODID:-//Studentlytics//Session Calendar//EN',
     'BEGIN:VEVENT',
     `DTSTART:${formatICS(startDateTime)}`,
     `DTEND:${formatICS(endDateTime)}`,

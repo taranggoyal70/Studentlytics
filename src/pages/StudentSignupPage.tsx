@@ -51,7 +51,7 @@ export default function StudentSignupPage() {
           <div className="mb-8">
             <Link to="/" className="flex items-center gap-2 mb-6">
               <GraduationCap className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">HighView</span>
+              <span className="text-2xl font-bold">Studentlytics</span>
             </Link>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
@@ -59,7 +59,7 @@ export default function StudentSignupPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold">Create Student Account</h1>
-                <p className="text-muted-foreground">Join HighView as a student</p>
+                <p className="text-muted-foreground">Join Studentlytics as a student</p>
               </div>
             </div>
           </div>
@@ -171,7 +171,7 @@ export default function StudentSignupPage() {
             Start Your Learning Journey
           </h2>
           <p className="text-xl text-purple-100 mb-8">
-            Join thousands of students using HighView to track progress and stay engaged
+            Join thousands of students using Studentlytics to track progress and stay engaged
           </p>
           <div className="space-y-4 text-left">
             {['Track your attendance', 'View course progress', 'Access learning materials', 'Connect with peers'].map((feature) => (

@@ -1,4 +1,8 @@
-const API_URL = 'http://localhost:8000/api/auth'
+import { requireApiEndpoint } from '../config/api'
+
+function getAuthApiUrl(): string {
+  return `${requireApiEndpoint()}/api/auth`
+}
 
 export interface User {
   id: number
@@ -38,7 +42,7 @@ class AuthService {
 
   async signup(data: SignupData): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_URL}/signup`, {
+      const response = await fetch(`${getAuthApiUrl()}/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,7 +72,7 @@ class AuthService {
 
   async login(data: LoginData): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_URL}/login`, {
+      const response = await fetch(`${getAuthApiUrl()}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +106,7 @@ class AuthService {
     }
 
     try {
-      const response = await fetch(`${API_URL}/me`, {
+      const response = await fetch(`${getAuthApiUrl()}/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.token}`,

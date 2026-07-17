@@ -48,7 +48,7 @@ export default function SessionsPage() {
         date: dates[index],
         time: times[index],
         type: types[index] as 'Virtual' | 'In-Person',
-        instructor: 'HighView Staff',
+        instructor: 'Studentlytics Staff',
         enrolled,
         rsvps,
       }

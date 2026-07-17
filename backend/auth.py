@@ -3,16 +3,17 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
 import jwt
+import os
 import sqlite3
 import hashlib
-import secrets
 from typing import Optional
+import bcrypt
 
 router = APIRouter()
 security = HTTPBearer()
 
 # Configuration
-SECRET_KEY = "your-secret-key-change-this-in-production"  # Change this!
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-only-change-this-secret-before-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
@@ -69,17 +70,22 @@ class TokenResponse(BaseModel):
 
 # Helper functions
 def hash_password(password: str) -> str:
-    """Hash a password using SHA-256 with salt"""
-    salt = secrets.token_hex(16)
-    pwd_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-    return f"{salt}${pwd_hash}"
+    """Hash a password using bcrypt."""
+    password_bytes = password.encode("utf-8")
+    return bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash"""
+    """Verify a password against bcrypt, with support for legacy salted SHA-256 hashes."""
     try:
-        salt, pwd_hash = hashed_password.split('$')
+        if hashed_password.startswith("$2"):
+            return bcrypt.checkpw(
+                plain_password.encode("utf-8"),
+                hashed_password.encode("utf-8")
+            )
+
+        salt, pwd_hash = hashed_password.split('$', 1)
         return hashlib.sha256((plain_password + salt).encode()).hexdigest() == pwd_hash
-    except:
+    except (ValueError, TypeError):
         return False
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
