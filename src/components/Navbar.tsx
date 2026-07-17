@@ -6,6 +6,12 @@ import { SignOutButton, UserButton, useAuth, useUser } from '@clerk/react'
 import { Button } from './ui/button'
 import { getClerkRole, getDisplayName } from '../auth/clerk'
 
+const publicNavItems = [
+  { name: 'Home', href: '/' },
+  { name: 'How it works', href: '/integrations' },
+  { name: 'Privacy', href: '/privacy' },
+]
+
 const studentNavItems = [
   { name: 'Home', href: '/' },
   { name: 'Sessions', href: '/sessions' },
@@ -44,41 +50,41 @@ export default function Navbar() {
 
   // Get navigation items based on user role
   const isStaff = userRole === 'teacher' || userRole === 'admin'
-  const navItems = isStaff ? staffNavItems : studentNavItems
+  const navItems = !isSignedIn ? publicNavItems : isStaff ? staffNavItems : studentNavItems
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
             <div className="flex items-center gap-3">
               {/* Circle Logo */}
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
-                <ScanFace className="h-8 w-8 text-white" />
+              <div className="flex h-10 w-10 items-center justify-center border border-slate-900 bg-slate-950">
+                <ScanFace className="h-5 w-5 text-emerald-300" />
               </div>
               {/* Company Name & Tagline */}
               <div className="flex flex-col">
-                <span className="text-xl font-bold text-primary">
+                <span className="text-lg font-bold tracking-tight text-slate-950">
                   Studentlytics
                 </span>
-                <span className="text-xs text-muted-foreground italic">
-                  Presence Intelligence Platform
+                <span className="text-xs font-medium text-slate-500">
+                  Presence intelligence
                 </span>
               </div>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             {navItems.map((item) => (
               <Link
                 key={item.name}
                 to={item.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors relative group"
+                className="group relative text-sm font-semibold text-slate-500 transition-colors hover:text-slate-950"
               >
                 {item.name}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
+                <span className="absolute -bottom-2 left-0 h-px w-0 bg-emerald-500 transition-all group-hover:w-full" />
               </Link>
             ))}
           </div>
@@ -88,10 +94,10 @@ export default function Navbar() {
             {isSignedIn ? (
               <>
                 {/* Role Badge (non-clickable) */}
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                <div className={`flex items-center gap-2 border px-3 py-2 text-sm font-semibold ${
                   isStaff
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-purple-100 text-purple-700'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-blue-200 bg-blue-50 text-blue-800'
                 }`}>
                   {isStaff ? (
                     <>
@@ -125,10 +131,10 @@ export default function Navbar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-border overflow-hidden z-50"
+                        className="absolute right-0 mt-2 w-64 overflow-hidden border border-slate-200 bg-white shadow-xl z-50"
                       >
                         {/* Profile Header */}
-                        <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-b">
+                        <div className="border-b bg-slate-50 p-4">
                           <div className="flex items-center gap-3">
                             <div>
                               <p className="font-semibold">{displayName}</p>
@@ -144,7 +150,7 @@ export default function Navbar() {
                               setIsProfileMenuOpen(false)
                               navigate('/profile')
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                           >
                             <UserCircle className="h-4 w-4 text-muted-foreground" />
                             <div>
@@ -157,7 +163,7 @@ export default function Navbar() {
                               setIsProfileMenuOpen(false)
                               navigate('/settings')
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                           >
                             <Settings className="h-4 w-4 text-muted-foreground" />
                             <div>
@@ -192,7 +198,7 @@ export default function Navbar() {
                   </Button>
                 </Link>
                 <Link to="/login">
-                  <Button size="sm" className="shadow-lg shadow-primary/20">
+                  <Button size="sm" className="bg-emerald-400 text-slate-950 shadow-none hover:bg-emerald-300">
                     Get Started
                   </Button>
                 </Link>
@@ -272,7 +278,7 @@ export default function Navbar() {
                       </Button>
                     </Link>
                     <Link to="/login" className="block">
-                      <Button className="w-full shadow-lg shadow-primary/20" size="sm">
+                      <Button className="w-full bg-emerald-400 text-slate-950 shadow-none hover:bg-emerald-300" size="sm">
                         Get Started
                       </Button>
                     </Link>

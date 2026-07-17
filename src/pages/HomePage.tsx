@@ -1,550 +1,324 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useAuth, useUser } from '@clerk/react'
-import HeroSection from '../components/HeroSection'
-import FeaturesSection from '../components/FeaturesSection'
-import StatsSection from '../components/StatsSection'
+import {
+  Activity,
+  ArrowRight,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardCheck,
+  FileVideo,
+  Gauge,
+  LockKeyhole,
+  Radio,
+  ScanFace,
+  ShieldCheck,
+  TimerReset,
+  Upload,
+  Users,
+} from 'lucide-react'
 import { Button } from '../components/ui/button'
-import { Card } from '../components/ui/card'
-import { BarChart3, Users, TrendingUp, Clock, Award, Target, MessageCircle, X } from 'lucide-react'
-import { realStudents } from '../data/transformStudents'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { getClerkRole, getDisplayName } from '../auth/clerk'
+import { getApiEndpoint } from '../config/api'
 
-// FAQ Responses
-const FAQ_RESPONSES: Record<string, string> = {
-  'how does it work': 'Studentlytics analyzes a classroom, webinar, conference, or training recording.\n\n1. Enroll known participants with approved photos\n2. Upload a session recording\n3. Face recognition identifies who attended\n4. The system creates check-in/check-out timelines\n5. Audio and visual signals generate engagement and participation scores',
-  'pricing': 'Simple pricing direction:\n\nFree pilot: small roster and limited processing\nTeam: departments, cohorts, and company training\nEnterprise: universities, conferences, SSO, retention controls, and integrations\n\nFinal pricing should be based on seats, processed hours, and compliance needs.',
-  'features': 'Key features:\n\nAttendance from face recognition\nCheck-in and check-out timestamps\nEarly-leave detection\nEngagement scoring\nCamera-off participation support\nOrganizer, admin, and participant dashboards',
-  'get started': 'Getting started:\n\n1. Create an organizer account\n2. Add a roster or attendee list\n3. Enroll participant photos with consent\n4. Upload a recording from class, Zoom, Meet, webinar, or event\n5. Review attendance, engagement, and drop-off reports',
-  'contact': 'Contact:\n\nEmail: support@studentlytics.ai\nWebsite: studentlytics.ai',
-  'accurate': 'Accuracy depends on roster quality, consented reference photos, camera angle, lighting, and video resolution. Studentlytics should always show confidence and evidence, and organizers should be able to override decisions with an audit trail.',
-}
-
-const quickQuestions = [
-  'How does it work?',
-  'What are the pricing plans?',
-  'What features do you offer?',
-  'How do I get started?',
-  'How accurate is it?',
-  'How can I contact support?'
+const productSignals = [
+  { label: 'First seen', value: '09:03:12' },
+  { label: 'Last seen', value: '10:41:08' },
+  { label: 'Visible time', value: '88 min' },
+  { label: 'Questions', value: '3' },
 ]
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-}
+const workflow = [
+  {
+    title: 'Upload a recording',
+    body: 'Use a classroom, webinar, Zoom, Meet, training, or conference export.',
+    icon: FileVideo,
+  },
+  {
+    title: 'Match the roster',
+    body: 'Compare consented participant profiles against video and audio evidence.',
+    icon: ScanFace,
+  },
+  {
+    title: 'Review evidence',
+    body: 'See attendance decisions, presence windows, early leaves, and engagement signals.',
+    icon: ClipboardCheck,
+  },
+]
 
-function getLocalAnalyticsAnswer(query: string): string {
-  const normalized = query.toLowerCase()
-  const totalStudents = realStudents.length
-  const avgAttendance = totalStudents
-    ? Math.round(realStudents.reduce((sum, student) => sum + student.attendanceRate, 0) / totalStudents)
-    : 0
-  const avgEngagement = totalStudents
-    ? Math.round(realStudents.reduce((sum, student) => sum + student.engagementScore, 0) / totalStudents)
-    : 0
-  const absentStudents = realStudents.filter(student => student.attendanceRate === 0)
-  const ranked = [...realStudents].sort((a, b) => b.engagementScore - a.engagementScore).slice(0, 5)
+const previewRows = [
+  { name: 'Participant A', decision: 'Present', time: '09:03-10:41', signal: 'Engaged', tone: 'emerald' },
+  { name: 'Participant B', decision: 'Left early', time: '09:02-09:37', signal: 'Needs review', tone: 'amber' },
+  { name: 'Participant C', decision: 'Camera-off present', time: '09:11-10:46', signal: 'Spoke 420 words', tone: 'blue' },
+]
 
-  if (normalized.includes('absent')) {
-    return absentStudents.length
-      ? `Absent students: ${absentStudents.map(student => student.name).join(', ')}.`
-      : 'No students are currently marked fully absent in the local roster.'
-  }
-
-  if (normalized.includes('ranking') || normalized.includes('top') || normalized.includes('engagement')) {
-    return `Top engagement rankings:\n${ranked.map((student, index) => `${index + 1}. ${student.name} - ${student.engagementScore}%`).join('\n')}`
-  }
-
-  if (normalized.includes('attendance')) {
-    return `${totalStudents} students are in the local roster. Average attendance is ${avgAttendance}%.`
-  }
-
-  return `Local analytics summary: ${totalStudents} students, ${avgAttendance}% average attendance, and ${avgEngagement}% average engagement. Configure VITE_AI_CHAT_API_URL to connect an external AI assistant.`
-}
-
-// AI Chatbot for Teachers (uses configured AI API or local roster analytics)
-function TeacherAIChatbot() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hi, I can answer questions about attendance, engagement, check-ins, early departures, and participant analytics.' }
-  ])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const API_URL = import.meta.env.VITE_AI_CHAT_API_URL
-
-  const suggestions = [
-    'How many people attended?',
-    'Show engagement rankings',
-    'Who left early?',
-    'What was the average attendance score?'
-  ]
-
-  const sendMessage = async () => {
-    if (!input.trim()) return
-
-    const userMsg: Message = { role: 'user', content: input }
-    const currentInput = input
-    setMessages(prev => [...prev, userMsg])
-    setInput('')
-    setLoading(true)
-
-    try {
-      if (!API_URL) {
-        const botMessage: Message = { role: 'assistant', content: getLocalAnalyticsAnswer(currentInput) }
-        setMessages(prev => [...prev, botMessage])
-        return
-      }
-
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: currentInput })
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`API returned status ${response.status}: ${errorText}`)
-      }
-
-      const responseText = await response.text()
-      
-      let data
-      try {
-        data = JSON.parse(responseText)
-      } catch {
-        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`)
-      }
-      
-      // Handle different possible response formats
-      let botResponse = ''
-      
-      if (data.response) {
-        botResponse = data.response
-      } else if (data.body) {
-        const bodyData = typeof data.body === 'string' ? JSON.parse(data.body) : data.body
-        botResponse = bodyData.response || bodyData.message || JSON.stringify(bodyData)
-      } else if (data.message) {
-        botResponse = data.message
-      } else if (data.answer) {
-        botResponse = data.answer
-      } else {
-        botResponse = JSON.stringify(data, null, 2)
-      }
-      
-      const botMessage: Message = { role: 'assistant', content: botResponse }
-      setMessages(prev => [...prev, botMessage])
-
-    } catch (error) {
-      console.error('Error details:', error)
-      const errorMessage: Message = { 
-        role: 'assistant', 
-        content: `I could not reach the analytics assistant: ${error instanceof Error ? error.message : 'Unknown error'}.`
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setLoading(false)
-    }
-  }
-
+function StatusPill({ active, children }: { active: boolean; children: string }) {
   return (
-    <>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 z-50"
-      >
-        {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-      </button>
-
-      {isOpen && (
-        <div className="fixed bottom-24 right-6 w-[450px] h-[600px] bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-lg">
-            <h3 className="font-bold text-lg">🤖 AI Analytics Assistant</h3>
-            <p className="text-sm opacity-90">Ask me about your student data</p>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none shadow border border-gray-100'}`}>
-                  <p className="text-xs font-semibold mb-1 opacity-75">
-                    {msg.role === 'user' ? 'You' : 'AI Assistant'}
-                  </p>
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-white p-3 rounded-lg shadow border border-gray-100">
-                  <p className="text-sm text-gray-600">AI is thinking...</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {messages.length === 1 && (
-            <div className="p-3 border-t border-gray-200 bg-white">
-              <p className="text-xs text-gray-600 mb-2 font-semibold">Try asking:</p>
-              <div className="flex flex-wrap gap-2">
-                {suggestions.map((suggestion, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setInput(suggestion)}
-                    className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !loading && sendMessage()}
-                placeholder="Ask about attendance, engagement..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={loading}
-              />
-              <button 
-                onClick={sendMessage} 
-                disabled={loading || !input.trim()} 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
+      active
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        : 'border-amber-200 bg-amber-50 text-amber-800'
+    }`}>
+      <span className={`h-2 w-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+      {children}
+    </span>
   )
 }
 
-// FAQ Chatbot Component (for landing page)
-function FAQChatbot() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '👋 Hi! I can help answer common questions about Studentlytics. What would you like to know?' }
-  ])
-  const [input, setInput] = useState('')
+function PublicHome() {
+  return (
+    <div className="bg-[#f7f8f4] text-slate-950">
+      <section className="relative min-h-[88vh] overflow-hidden">
+        <img
+          src="/classroom-hero.png"
+          alt="Classroom session being reviewed for attendance and engagement"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/88 via-slate-950/62 to-slate-950/12" />
+        <div className="relative z-10 flex min-h-[88vh] items-center">
+          <div className="container mx-auto px-4 py-16">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="max-w-3xl text-white"
+            >
+              <div className="mb-6 inline-flex items-center gap-2 border border-white/20 bg-white/10 px-3 py-1 text-sm font-semibold backdrop-blur">
+                <Radio className="h-4 w-4 text-emerald-300" />
+                Recordings first. Live adapters next.
+              </div>
+              <h1 className="max-w-2xl text-5xl font-bold leading-[0.98] tracking-normal md:text-7xl">
+                Presence evidence for every room and call.
+              </h1>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
+                Studentlytics turns recordings into attendance decisions, check-in/out timelines, early-leave flags, and explainable engagement signals for universities, companies, webinars, and events.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to="/login?role=teacher">
+                  <Button size="lg" className="h-12 bg-emerald-400 px-6 text-slate-950 hover:bg-emerald-300">
+                    Open organizer console
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link to="/login?role=student">
+                  <Button size="lg" variant="outline" className="h-12 border-white/30 bg-white/10 px-6 text-white hover:bg-white/20 hover:text-white">
+                    Participant portal
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
-  const findBestMatch = (query: string): string => {
-    const q = query.toLowerCase()
-    
-    for (const [keywords, response] of Object.entries(FAQ_RESPONSES)) {
-      if (q.includes(keywords)) {
-        return response
-      }
-    }
-    
-    return `🤔 I'm not sure about that. Try asking about:\n\n${quickQuestions.slice(0, 4).map(q => `• ${q}`).join('\n')}\n\n📧 Or contact us: support@studentlytics.ai`
-  }
+      <section className="border-y border-slate-200 bg-white">
+        <div className="container mx-auto grid gap-0 px-4 py-8 md:grid-cols-4">
+          {productSignals.map((signal) => (
+            <div key={signal.label} className="border-slate-200 py-4 md:border-r md:px-6 last:border-r-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{signal.label}</p>
+              <p className="mt-2 text-3xl font-bold text-slate-950">{signal.value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-  const sendMessage = () => {
-    if (!input.trim()) return
+      <section className="container mx-auto px-4 py-16">
+        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">The actual workflow</p>
+            <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-normal">From recording to evidence-backed report.</h2>
+          </div>
+          <p className="max-w-md text-slate-600">
+            The product is not a course catalog. It is an evidence layer for attendance, presence, and participation.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {workflow.map((step) => (
+            <Card key={step.title} className="border-slate-200 bg-white shadow-none">
+              <CardHeader>
+                <div className="mb-4 flex h-11 w-11 items-center justify-center border border-slate-200 bg-[#f7f8f4] text-slate-900">
+                  <step.icon className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-xl">{step.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-6 text-slate-600">{step.body}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
 
-    const userMsg: Message = { role: 'user', content: input }
-    setMessages(prev => [...prev, userMsg])
-
-    const response = findBestMatch(input)
-    
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'assistant', content: response }])
-    }, 500)
-
-    setInput('')
-  }
+function OperatorHome() {
+  const { user } = useUser()
+  const role = getClerkRole(user)
+  const displayName = getDisplayName(user)
+  const apiEndpoint = getApiEndpoint()
+  const apiConnected = Boolean(apiEndpoint)
+  const isStaff = role === 'teacher' || role === 'admin'
 
   return (
-    <>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 z-50"
-      >
-        {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-      </button>
-
-      {isOpen && (
-        <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200">
-          <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-4 rounded-t-lg">
-            <h3 className="font-bold text-lg">Quick Help</h3>
-            <p className="text-sm opacity-90">Ask me anything!</p>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none shadow border border-gray-100'}`}>
-                  <p className="text-sm whitespace-pre-line">{msg.content}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {messages.length === 1 && (
-            <div className="p-3 border-t border-gray-200 bg-white">
-              <p className="text-xs text-gray-600 mb-2 font-semibold">Quick questions:</p>
-              <div className="grid grid-cols-2 gap-2">
-                {quickQuestions.slice(0, 4).map((q, idx) => (
-                  <button key={idx} onClick={() => setInput(q)} className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 text-left">{q}</button>
-                ))}
-              </div>
+    <div className="min-h-screen bg-[#f4f5f1] text-slate-950">
+      <section className="border-b border-slate-200 bg-white">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {isStaff ? 'Organizer workspace' : 'Participant workspace'}
+              </p>
+              <h1 className="mt-3 text-4xl font-bold tracking-normal md:text-5xl">
+                {isStaff ? 'Command center' : 'My presence record'}
+              </h1>
+              <p className="mt-3 max-w-2xl text-slate-600">
+                Welcome, {displayName}. This workspace is now shaped around sessions, people, evidence, and reports.
+              </p>
             </div>
-          )}
-
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Ask a question..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button onClick={sendMessage} disabled={!input.trim()} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50">
-                →
-              </button>
+            <div className="flex flex-wrap gap-2">
+              <StatusPill active>Clerk auth connected</StatusPill>
+              <StatusPill active={apiConnected}>{apiConnected ? 'API connected' : 'API endpoint missing'}</StatusPill>
             </div>
           </div>
         </div>
-      )}
-    </>
+      </section>
+
+      <section className="container mx-auto px-4 py-8">
+        <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <Card className="overflow-hidden border-slate-200 bg-slate-950 text-white shadow-none">
+            <CardContent className="p-0">
+              <div className="grid md:grid-cols-[0.9fr_1.1fr]">
+                <div className="border-b border-white/10 p-6 md:border-b-0 md:border-r">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Next setup step</p>
+                  <h2 className="mt-4 text-3xl font-bold leading-tight">
+                    Connect the backend API before treating reports as live.
+                  </h2>
+                  <p className="mt-4 text-sm leading-6 text-slate-300">
+                    The interface is ready for real data, but production still needs the deployed API endpoint, database, and customer-controlled processing runtime.
+                  </p>
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                    <Link to="/integrations">
+                      <Button className="bg-emerald-400 text-slate-950 hover:bg-emerald-300">
+                        Review integrations
+                      </Button>
+                    </Link>
+                    <Link to="/sessions">
+                      <Button variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                        Open sessions
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Authentication', value: 'Connected', icon: LockKeyhole, good: true },
+                      { label: 'Backend API', value: apiConnected ? 'Connected' : 'Needs VITE_API_ENDPOINT', icon: Activity, good: apiConnected },
+                      { label: 'Roster source', value: 'Needs database', icon: Users, good: false },
+                      { label: 'Reports', value: 'Waiting on processed recordings', icon: Gauge, good: false },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center justify-between border border-white/10 bg-white/[0.04] px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <item.icon className="h-4 w-4 text-slate-300" />
+                          <span className="text-sm font-medium">{item.label}</span>
+                        </div>
+                        <span className={item.good ? 'text-sm text-emerald-300' : 'text-sm text-amber-300'}>{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 bg-white shadow-none">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <TimerReset className="h-5 w-5 text-emerald-700" />
+                Presence preview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {previewRows.map((row) => (
+                <div key={row.name} className="grid grid-cols-[1fr_auto] gap-3 border border-slate-200 p-3">
+                  <div>
+                    <p className="font-semibold">{row.name}</p>
+                    <p className="text-sm text-slate-500">{row.time}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{row.decision}</p>
+                    <p className={`text-xs ${
+                      row.tone === 'emerald' ? 'text-emerald-700' : row.tone === 'amber' ? 'text-amber-700' : 'text-blue-700'
+                    }`}>
+                      {row.signal}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <p className="text-xs leading-5 text-slate-500">
+                Preview only until the production API and database are connected.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mt-5 grid gap-5 md:grid-cols-4">
+          {[
+            { label: 'Sessions', value: 'Recordings and live rooms', icon: CalendarClock, href: '/sessions' },
+            { label: 'People', value: 'Roster and face enrollment', icon: Users, href: '/students' },
+            { label: 'Attendance', value: 'Check-in/out timelines', icon: CheckCircle2, href: '/attendance' },
+            { label: 'Reports', value: 'Engagement and evidence', icon: ShieldCheck, href: '/analytics' },
+          ].map((item) => (
+            <Link key={item.label} to={item.href}>
+              <Card className="h-full border-slate-200 bg-white shadow-none transition-colors hover:border-slate-400">
+                <CardContent className="p-5">
+                  <item.icon className="mb-5 h-5 w-5 text-slate-700" />
+                  <p className="font-semibold">{item.label}</p>
+                  <p className="mt-1 text-sm text-slate-500">{item.value}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+
+        <Card className="mt-5 border-slate-200 bg-white shadow-none">
+          <CardHeader>
+            <CardTitle className="text-xl">Operational workflow</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              {workflow.map((step) => (
+                <div key={step.title} className="border-l-2 border-slate-900 pl-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center bg-[#f4f5f1] text-slate-900">
+                    <step.icon className="h-4 w-4" />
+                  </div>
+                  <p className="font-semibold">{step.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {isStaff && (
+          <div className="mt-5">
+            <Link to="/sessions">
+              <Button className="h-12 bg-slate-950 px-6 text-white hover:bg-slate-800">
+                <Upload className="mr-2 h-4 w-4" />
+                Start with a recording
+              </Button>
+            </Link>
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
 
 export default function HomePage() {
   const { isSignedIn } = useAuth()
-  const { user } = useUser()
-  const userRole = getClerkRole(user)
-  const displayName = getDisplayName(user)
 
-  // If not authenticated, show landing page
-  if (!isSignedIn) {
-    return (
-      <div>
-        <HeroSection />
-        <FeaturesSection />
-        <StatsSection />
-        <FAQChatbot />
-        
-        {/* CTA Section */}
-        <section className="py-20 px-4">
-          <div className="container mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-blue-100 via-blue-50 to-indigo-100 px-8 py-16 md:px-16 md:py-20"
-            >
-              <div className="absolute inset-0 opacity-30">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-300 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-300 rounded-full blur-3xl" />
-              </div>
-
-              <div className="relative z-10 text-center max-w-3xl mx-auto">
-                <motion.h2
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 0.2 }}
-                  className="text-3xl md:text-4xl lg:text-5xl font-bold text-slate-900 mb-8"
-                >
-                  Ready to transform your school?
-                </motion.h2>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 0.4 }}
-                >
-                  <Button
-                    size="lg"
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-base px-10 py-6 rounded-full shadow-lg hover:shadow-xl transition-all"
-                  >
-                    Contact sales
-                  </Button>
-                </motion.div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      </div>
-    )
-  }
-
-  // Teacher Dashboard
-  if (userRole === 'teacher') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8">
-        <div className="container mx-auto px-4">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <h1 className="text-4xl font-bold mb-2">Teacher Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, {displayName}! Here's an overview of your cohort.</p>
-          </motion.div>
-
-          {/* Real student count stat */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Total Students</p>
-                    <p className="text-3xl font-bold">{realStudents.length}</p>
-                    <p className="text-xs text-muted-foreground mt-1">2026-27 College Cohort</p>
-                  </div>
-                  <div className="bg-blue-50 p-3 rounded-full">
-                    <Users className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Avg Attendance</p>
-                    <p className="text-3xl font-bold">—</p>
-                    <p className="text-xs text-muted-foreground mt-1">Available after sessions start</p>
-                  </div>
-                  <div className="bg-purple-50 p-3 rounded-full">
-                    <Clock className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Avg Engagement</p>
-                    <p className="text-3xl font-bold">—</p>
-                    <p className="text-xs text-muted-foreground mt-1">Available after sessions start</p>
-                  </div>
-                  <div className="bg-green-50 p-3 rounded-full">
-                    <TrendingUp className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Link to full student list */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card className="p-6">
-              <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Studentlytics Cohort
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {realStudents.length} students enrolled. Class sessions have not started yet — attendance and engagement data will populate once recordings are processed.
-              </p>
-              <Link to="/students">
-                <Button>View All Students</Button>
-              </Link>
-            </Card>
-          </motion.div>
-        </div>
-        <TeacherAIChatbot />
-      </div>
-    )
-  }
-
-  // Student Dashboard
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 py-8">
-      <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-4xl font-bold mb-2">My Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {displayName}! Track your progress and performance.</p>
-        </motion.div>
-
-        {/* Student Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[
-            { icon: TrendingUp, label: 'My Engagement', value: '—', color: 'text-green-600', bg: 'bg-green-50' },
-            { icon: Clock, label: 'Attendance Rate', value: '—', color: 'text-blue-600', bg: 'bg-blue-50' },
-            { icon: Award, label: 'Current Grade', value: '—', color: 'text-amber-600', bg: 'bg-amber-50' },
-            { icon: Target, label: 'Sessions Attended', value: '—', color: 'text-purple-600', bg: 'bg-purple-50' },
-          ].map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                    <p className="text-3xl font-bold">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Available after sessions start</p>
-                  </div>
-                  <div className={`${stat.bg} p-3 rounded-full`}>
-                    <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* My Courses */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              My Courses
-            </h3>
-            <p className="text-muted-foreground text-sm">Course data will appear once sessions are processed.</p>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Upcoming Tasks
-            </h3>
-            <p className="text-muted-foreground text-sm">No upcoming tasks at this time.</p>
-          </Card>
-        </div>
-      </div>
-    </div>
-  )
+  return isSignedIn ? <OperatorHome /> : <PublicHome />
 }
