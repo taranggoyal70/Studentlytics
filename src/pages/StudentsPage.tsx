@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { Search, Plus, Eye, Mail, BarChart3, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
+import { Search, Plus, Eye, Mail, BarChart3, ChevronLeft, ChevronRight, Activity, Download } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { useState, useEffect, useMemo } from 'react'
 import { getAllStudents, addStudent } from '../services/api'
+import { toCsv, downloadCsv } from '../utils/csv'
 import {
   BarChart,
   Bar,
@@ -205,6 +206,31 @@ export default function StudentsPage() {
                   <option key={className} value={className}>{className}</option>
                 ))}
               </select>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                disabled={filteredStudents.length === 0}
+                onClick={() => {
+                  const csv = toCsv(
+                    filteredStudents.map((s: any) => ({
+                      student_id: s.student_id,
+                      student_name: s.student_name,
+                      class_name: s.class_name,
+                      department: s.department,
+                      attendance: s.attendance,
+                      engagement: s.engagement,
+                      grade: s.grade,
+                      speaking_time: s.speaking_time,
+                      student_email: s.student_email,
+                    })),
+                  )
+                  downloadCsv(`students-${new Date().toISOString().slice(0, 10)}.csv`, csv)
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV ({filteredStudents.length})
+              </Button>
             </div>
           </Card>
 
